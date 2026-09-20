@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>FB Ads Library Toplayıcı</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <h1>Facebook Ads Library</h1>
+  <p class="subtitle">Reklam veren toplayıcı</p>
+
+  <div class="stat">
+    <span id="count">0</span>
+    <span class="label">benzersiz reklam veren</span>
+  </div>
+
+  <div class="actions">
+    <button id="exportBtn">Excel'e Aktar (.xlsx)</button>
+    <button id="clearBtn" class="secondary">Verileri Temizle</button>
+  </div>
+
+  <p id="status" class="status"></p>
+
+  <p class="hint">
+    facebook.com/ads/library sayfasında aşağı kaydırdıkça yeni reklamlar otomatik
+    olarak taranır. Aynı reklam veren tekrar kaydedilmez.
+  </p>
+
+  <script src="xlsx-writer.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
