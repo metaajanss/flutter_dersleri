@@ -1,9 +1,17 @@
 const STORAGE_KEY = "fbAdsLibraryData";
+const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
+const AUTO_STATUS_KEY = "fbAdsAutoStatus";
 
 const countEl = document.getElementById("count");
 const exportBtn = document.getElementById("exportBtn");
 const clearBtn = document.getElementById("clearBtn");
 const statusEl = document.getElementById("status");
+const keywordInput = document.getElementById("keyword");
+const countInput = document.getElementById("countInput");
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const autoStatusEl = document.getElementById("autoStatus");
+const modeRadios = document.querySelectorAll('input[name="mode"]');
 
 const HEADERS = [
   "Reklam Veren Adı",
@@ -50,13 +58,124 @@ async function refreshCount() {
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
-  chrome.downloads.download(
-    { url, filename, saveAs: true },
-    () => {
-      URL.revokeObjectURL(url);
-    }
-  );
+  chrome.downloads.download({ url, filename, saveAs: true }, () => {
+    URL.revokeObjectURL(url);
+  });
 }
+
+function buildAdsLibraryUrl(keyword) {
+  const params = new URLSearchParams({
+    active_status: "active",
+    ad_type: "all",
+    country: "ALL",
+    is_targeted_country: "false",
+    media_type: "all",
+    q: keyword,
+    search_type: "keyword_unordered",
+  });
+  return `https://www.facebook.com/ads/library/?${params.toString()}`;
+}
+
+function currentMode() {
+  return [...modeRadios].find((r) => r.checked)?.value || "all";
+}
+
+function updateModeUi() {
+  countInput.disabled = currentMode() !== "count";
+}
+
+function renderAutoStatus(status, config) {
+  if (!status) {
+    autoStatusEl.hidden = true;
+    startBtn.hidden = false;
+    stopBtn.hidden = true;
+    return;
+  }
+
+  const targetLabel =
+    config && config.mode === "count" ? `${config.targetCount} adet` : "tüm sonuçlar";
+
+  if (status.running) {
+    autoStatusEl.hidden = false;
+    autoStatusEl.className = "auto-status";
+    autoStatusEl.textContent = `Otomatik kaydırma çalışıyor... Toplanan: ${status.collected} / Hedef: ${targetLabel}`;
+    startBtn.hidden = true;
+    stopBtn.hidden = false;
+  } else if (status.finished) {
+    autoStatusEl.hidden = false;
+    autoStatusEl.className = "auto-status finished";
+    autoStatusEl.textContent = `Tamamlandı (${status.reason || ""}). Toplanan: ${status.collected}.`;
+    startBtn.hidden = false;
+    stopBtn.hidden = true;
+  } else {
+    autoStatusEl.hidden = true;
+    startBtn.hidden = false;
+    stopBtn.hidden = true;
+  }
+}
+
+async function refreshAutoStatus() {
+  const result = await chrome.storage.local.get([AUTO_STATUS_KEY, AUTO_CONFIG_KEY]);
+  renderAutoStatus(result[AUTO_STATUS_KEY], result[AUTO_CONFIG_KEY]);
+}
+
+modeRadios.forEach((radio) => radio.addEventListener("change", updateModeUi));
+updateModeUi();
+
+startBtn.addEventListener("click", async () => {
+  const keyword = keywordInput.value.trim();
+  if (!keyword) {
+    showStatus("Lütfen bir anahtar kelime girin.", "error");
+    return;
+  }
+
+  const mode = currentMode();
+  const targetCount = mode === "count" ? parseInt(countInput.value, 10) : 0;
+  if (mode === "count" && (!Number.isFinite(targetCount) || targetCount <= 0)) {
+    showStatus("Lütfen geçerli bir adet girin.", "error");
+    return;
+  }
+
+  const url = buildAdsLibraryUrl(keyword);
+
+  await chrome.storage.local.set({
+    [AUTO_CONFIG_KEY]: {
+      keyword,
+      mode,
+      targetCount: mode === "count" ? targetCount : 0,
+      running: true,
+      startedAt: Date.now(),
+    },
+    [AUTO_STATUS_KEY]: {
+      running: true,
+      finished: false,
+      collected: 0,
+      target: mode === "count" ? targetCount : null,
+      reason: "",
+    },
+  });
+
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab && tab.url && tab.url.startsWith("https://www.facebook.com/ads/library")) {
+    await chrome.tabs.update(tab.id, { url });
+  } else {
+    await chrome.tabs.create({ url });
+  }
+
+  showStatus("Arama başlatıldı, otomatik kaydırma çalışacak.", "success");
+  await refreshAutoStatus();
+});
+
+stopBtn.addEventListener("click", async () => {
+  const result = await chrome.storage.local.get(AUTO_CONFIG_KEY);
+  const config = result[AUTO_CONFIG_KEY];
+  if (config) {
+    await chrome.storage.local.set({
+      [AUTO_CONFIG_KEY]: { ...config, running: false },
+    });
+  }
+  showStatus("Otomasyon durduruluyor...", "success");
+});
 
 exportBtn.addEventListener("click", async () => {
   const records = await getRecords();
@@ -88,9 +207,10 @@ clearBtn.addEventListener("click", async () => {
 });
 
 refreshCount();
+refreshAutoStatus();
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes[STORAGE_KEY]) {
-    refreshCount();
-  }
+  if (area !== "local") return;
+  if (changes[STORAGE_KEY]) refreshCount();
+  if (changes[AUTO_STATUS_KEY] || changes[AUTO_CONFIG_KEY]) refreshAutoStatus();
 });

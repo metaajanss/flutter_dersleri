@@ -17,6 +17,70 @@ h1 {
   color: #65676b;
 }
 
+.field {
+  margin-bottom: 12px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.field input[type="text"],
+.field input[type="number"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  font-size: 13px;
+  border: 1px solid #dddfe2;
+  border-radius: 6px;
+}
+
+.field input[type="number"] {
+  margin-top: 8px;
+}
+
+.field input:disabled {
+  background: #f0f2f5;
+  color: #98999e;
+}
+
+.radio-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+#startBtn {
+  background: #42b72a;
+  color: #fff;
+}
+
+.auto-status {
+  background: #fff8e1;
+  border: 1px solid #ffe08a;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 11px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.auto-status.finished {
+  background: #e6f4ea;
+  border-color: #b7dfc0;
+}
+
 .stat {
   text-align: center;
   background: #f0f2f5;

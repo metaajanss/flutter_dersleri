@@ -20,7 +20,7 @@
   "background": {
     "service_worker": "background.js"
   },
-  "permissions": ["storage", "activeTab", "scripting", "downloads"],
+  "permissions": ["storage", "activeTab", "scripting", "downloads", "tabs"],
   "host_permissions": ["https://www.facebook.com/ads/library/*"],
   "content_scripts": [
     {

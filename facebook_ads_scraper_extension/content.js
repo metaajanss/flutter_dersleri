@@ -5,10 +5,13 @@
 
 (() => {
   const STORAGE_KEY = "fbAdsLibraryData";
+  const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
+  const AUTO_STATUS_KEY = "fbAdsAutoStatus";
   const SEEN_KEYS_IN_MEMORY = new Set(); // bu sekmede zaten işlenmiş kart elemanlarını tutar (WeakSet yerine Set+WeakMap)
   const PROCESSED_ELEMENTS = new WeakSet();
   let scanScheduled = false;
   let totalCountCache = 0;
+  let autoScrollRunning = false; // aynı sekmede döngünün iki kez başlamasını engeller
 
   function textOf(el) {
     return (el && el.innerText ? el.innerText : "").replace(/\s+/g, " ").trim();
@@ -133,7 +136,7 @@
     }
   }
 
-  function scanNow() {
+  async function performScan() {
     scanScheduled = false;
     const cards = findAdCards();
     const fresh = [];
@@ -151,13 +154,13 @@
       }
     }
 
-    if (fresh.length > 0) saveRecords(fresh);
+    if (fresh.length > 0) await saveRecords(fresh);
   }
 
   function scheduleScan() {
     if (scanScheduled) return;
     scanScheduled = true;
-    setTimeout(scanNow, 700); // sayfa kaydırılırken gelen çoklu DOM değişikliklerini tek seferde işlemek için debounce
+    setTimeout(performScan, 700); // sayfa kaydırılırken gelen çoklu DOM değişikliklerini tek seferde işlemek için debounce
   }
 
   const observer = new MutationObserver(() => scheduleScan());
@@ -165,4 +168,122 @@
 
   // İlk yüklemede mevcut kartları da tara.
   scheduleScan();
+
+  // ---- Otomatik arama + aşağı kaydırma ----
+  // Popup'tan "ara ve topla" başlatıldığında chrome.storage'a yazılan ayarlar
+  // (anahtar kelime, hedef mod/adet, running bayrağı) bu sekme yeniden
+  // yüklendiğinde okunur ve otomasyon burada, content script içinde çalışır;
+  // böylece popup kapansa bile toplama arka planda devam eder.
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function getAutoConfig() {
+    const result = await chrome.storage.local.get(AUTO_CONFIG_KEY);
+    return result[AUTO_CONFIG_KEY] || null;
+  }
+
+  async function getCollectedCount() {
+    const result = await chrome.storage.local.get(STORAGE_KEY);
+    return Object.keys(result[STORAGE_KEY] || {}).length;
+  }
+
+  async function setAutoStatus(status) {
+    await chrome.storage.local.set({ [AUTO_STATUS_KEY]: status });
+  }
+
+  async function stopAutomation(reason) {
+    const config = await getAutoConfig();
+    if (config) {
+      await chrome.storage.local.set({
+        [AUTO_CONFIG_KEY]: { ...config, running: false },
+      });
+    }
+    const collected = await getCollectedCount();
+    await setAutoStatus({ running: false, finished: true, collected, reason });
+  }
+
+  function scrollToBottom() {
+    const scrollHeight = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight
+    );
+    window.scrollTo(0, scrollHeight);
+  }
+
+  async function runAutoScrollLoop() {
+    if (autoScrollRunning) return;
+    autoScrollRunning = true;
+
+    const MAX_IDLE_STREAK = 6; // art arda bu kadar kaydırmada yeni reklam veren gelmezse sonuna gelinmiş sayılır
+    const MAX_ITERATIONS = 4000; // sonsuz döngüye karşı güvenlik sınırı
+
+    let idleStreak = 0;
+    let iterations = 0;
+
+    try {
+      while (true) {
+        const config = await getAutoConfig();
+        if (!config || !config.running) {
+          await stopAutomation("durduruldu");
+          return;
+        }
+
+        const before = await getCollectedCount();
+        scrollToBottom();
+        await sleep(1500 + Math.random() * 500);
+        await performScan();
+        const after = await getCollectedCount();
+        iterations++;
+
+        await setAutoStatus({
+          running: true,
+          finished: false,
+          collected: after,
+          target: config.mode === "count" ? config.targetCount : null,
+          reason: "",
+        });
+
+        if (config.mode === "count" && after >= config.targetCount) {
+          await stopAutomation("hedef adede ulaşıldı");
+          return;
+        }
+
+        idleStreak = after === before ? idleStreak + 1 : 0;
+
+        if (config.mode === "all" && idleStreak >= MAX_IDLE_STREAK) {
+          await stopAutomation("tüm sonuçlar tarandı");
+          return;
+        }
+
+        if (iterations >= MAX_ITERATIONS) {
+          await stopAutomation("maksimum deneme sınırına ulaşıldı");
+          return;
+        }
+      }
+    } finally {
+      autoScrollRunning = false;
+    }
+  }
+
+  async function initAutomationIfNeeded() {
+    const config = await getAutoConfig();
+    if (config && config.running) {
+      // Aramanın ilk sonuçlarının render olması için kısa bir bekleme.
+      await sleep(2500);
+      runAutoScrollLoop();
+    }
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes[AUTO_CONFIG_KEY]) {
+      const newValue = changes[AUTO_CONFIG_KEY].newValue;
+      if (newValue && newValue.running && !autoScrollRunning) {
+        runAutoScrollLoop();
+      }
+    }
+  });
+
+  initAutomationIfNeeded();
 })();

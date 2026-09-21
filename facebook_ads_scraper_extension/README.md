@@ -1,9 +1,9 @@
 # Facebook Ads Library Reklam Veren Çekici (Chrome Eklentisi)
 
-`facebook.com/ads/library` sayfasında gezinirken, aşağı kaydırdıkça yüklenen
-reklamlardan reklam veren (sayfa) bilgilerini otomatik olarak toplar, aynı
-reklam vereni tekrar kaydetmez ve toplanan veriyi tek tıkla Excel (.xlsx)
-dosyası olarak dışa aktarır.
+Facebook Ads Library'de verdiğin bir anahtar kelimeyle otomatik arama açar,
+sayfayı kendi kendine aşağı kaydırarak aktif reklamların reklam veren
+bilgilerini toplar, aynı reklam vereni tekrar kaydetmez ve toplanan veriyi
+tek tıkla Excel (.xlsx) dosyası olarak dışa aktarır.
 
 ## Kurulum
 
@@ -14,13 +14,25 @@ dosyası olarak dışa aktarır.
 
 ## Kullanım
 
-1. `https://www.facebook.com/ads/library/...` adresinde bir arama açın.
-2. Sayfayı aşağı kaydırdıkça yeni reklamlar yüklenir; eklenti bunları arka
-   planda otomatik tarar (araç çubuğundaki simgede sayaç görünür).
-3. Eklenti simgesine tıklayıp toplanan **benzersiz reklam veren sayısını**
-   görün.
-4. **Excel'e Aktar (.xlsx)** butonuna basarak veriyi indirin.
-5. Gerekirse **Verileri Temizle** ile birikmiş veriyi sıfırlayın.
+1. Eklenti simgesine tıklayın, **Anahtar Kelime** kutusuna arama teriminizi
+   yazın (örn. "spor ayakkabı").
+2. **Toplama Miktarı** olarak "Tüm sonuçları çek" ya da "Belirli adet çek"
+   (adet girerek) seçin.
+3. **Aramayı Başlat ve Topla** butonuna basın: eklenti otomatik olarak
+   `facebook.com/ads/library` üzerinde aktif reklamlar için o anahtar
+   kelimeyle arama açar ve sayfayı kendi kendine aşağı kaydırmaya başlar.
+4. Kaydırma arka planda devam eder (popup'ı kapatsanız bile durmaz).
+   Popup'ı tekrar açtığınızda güncel "toplanan / hedef" durumunu görürsünüz.
+   İstediğiniz an **Otomasyonu Durdur** ile durdurabilirsiniz.
+5. "Tüm sonuçları çek" seçiliyse, art arda birkaç kaydırmada yeni reklam
+   veren gelmeyince (sayfanın sonuna gelindiği anlaşılınca) otomasyon kendi
+   kendine durur. "Belirli adet" seçiliyse hedef adede ulaşınca durur.
+6. **Excel'e Aktar (.xlsx)** butonuna basarak veriyi indirin.
+7. Gerekirse **Verileri Temizle** ile birikmiş veriyi sıfırlayın.
+
+Not: Sayfayı manuel olarak `facebook.com/ads/library` adresinde gezinirken
+de (arama başlatmadan) eklenti gördüğü reklamları arka planda otomatik
+tarar — anahtar kelimeli otomatik kaydırma isteğe bağlı bir kolaylıktır.
 
 ## Toplanan alanlar
 
@@ -54,3 +66,14 @@ tutulur.
 - `.xlsx` dosyası harici bir kütüphane kullanılmadan (SheetJS vb. yüklenmeden)
   doğrudan bu eklenti içinde (`xlsx-writer.js`) üretilir; ağ bağlantısı veya
   uzak betik gerektirmez.
+- Otomatik arama URL'i varsayılan olarak tüm ülkeleri (`country=ALL`) hedefler
+  ve yalnızca aktif reklamları (`active_status=active`) getirir. Belirli bir
+  ülkeyle sınırlamak isterseniz `popup.js` içindeki `buildAdsLibraryUrl`
+  fonksiyonunda `country` parametresini (örn. `TR`) değiştirebilirsiniz.
+- "Tüm sonuçları çek" modunda bitiş tespiti, art arda birkaç kaydırmada yeni
+  benzersiz reklam veren gelmemesine dayanır (heuristic); Facebook'un
+  sonsuz kaydırması gerçekten bittiyse otomasyon kendini durdurur, ancak çok
+  yavaş yüklenen bağlantılarda nadiren erken durabilir — bu durumda sayfayı
+  elle biraz kaydırıp yeniden "Aramayı Başlat" ile devam edilebilir.
+- Otomatik kaydırma her adımda ~1.5-2 saniye bekler; çok büyük sonuç
+  kümelerinde (binlerce reklam) tüm veriyi toplamak zaman alabilir.
