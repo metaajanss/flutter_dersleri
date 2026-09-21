@@ -7,6 +7,7 @@
   const STORAGE_KEY = "fbAdsLibraryData";
   const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
   const AUTO_STATUS_KEY = "fbAdsAutoStatus";
+  const JUMPIX_CONFIG_KEY = "fbAdsJumpixConfig";
   const SEEN_KEYS_IN_MEMORY = new Set(); // bu sekmede zaten işlenmiş kart elemanlarını tutar (WeakSet yerine Set+WeakMap)
   const PROCESSED_ELEMENTS = new WeakSet();
   let scanScheduled = false;
@@ -85,7 +86,7 @@
     return { advertiserName, advertiserUrl, pageId };
   }
 
-  function extractAdData(card) {
+  function extractAdData(card, keyword) {
     const fullText = textOf(card);
     if (!fullText.includes("Library ID")) return null;
 
@@ -105,6 +106,7 @@
       status: statusMatch ? statusMatch[1] : "",
       startedRunning: startedMatch ? startedMatch[1].trim() : "",
       platforms: platformsMatch ? platformsMatch[1].trim() : "",
+      searchKeyword: keyword || "",
       pageUrl: location.href,
       scrapedAt: new Date().toISOString(),
     };
@@ -115,24 +117,35 @@
   }
 
   async function saveRecords(newRecords) {
-    if (newRecords.length === 0) return;
+    if (newRecords.length === 0) return [];
 
     const result = await chrome.storage.local.get(STORAGE_KEY);
     const store = result[STORAGE_KEY] || {};
-    let added = 0;
+    const addedItems = [];
 
     for (const record of newRecords) {
       const key = dedupeKey(record);
       if (!store[key]) {
         store[key] = record;
-        added++;
+        addedItems.push({ key, record });
       }
     }
 
-    if (added > 0) {
+    if (addedItems.length > 0) {
       await chrome.storage.local.set({ [STORAGE_KEY]: store });
       totalCountCache = Object.keys(store).length;
       chrome.runtime.sendMessage({ type: "FB_ADS_COUNT_UPDATED", count: totalCountCache }).catch(() => {});
+    }
+
+    return addedItems;
+  }
+
+  async function maybeAutoSendToJumpix(addedItems) {
+    if (addedItems.length === 0) return;
+    const result = await chrome.storage.local.get(JUMPIX_CONFIG_KEY);
+    const config = result[JUMPIX_CONFIG_KEY];
+    if (config && config.autoSend && config.webhookUrl) {
+      chrome.runtime.sendMessage({ type: "JUMPIX_SEND_RECORDS", items: addedItems }).catch(() => {});
     }
   }
 
@@ -140,10 +153,12 @@
     scanScheduled = false;
     const cards = findAdCards();
     const fresh = [];
+    const autoConfig = await getAutoConfig();
+    const keyword = (autoConfig && autoConfig.keyword) || "";
 
     for (const card of cards) {
       if (PROCESSED_ELEMENTS.has(card)) continue;
-      const data = extractAdData(card);
+      const data = extractAdData(card, keyword);
       if (data) {
         PROCESSED_ELEMENTS.add(card);
         const key = dedupeKey(data);
@@ -154,7 +169,10 @@
       }
     }
 
-    if (fresh.length > 0) await saveRecords(fresh);
+    if (fresh.length > 0) {
+      const added = await saveRecords(fresh);
+      await maybeAutoSendToJumpix(added);
+    }
   }
 
   function scheduleScan() {

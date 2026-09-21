@@ -22,6 +22,7 @@
   },
   "permissions": ["storage", "activeTab", "scripting", "downloads", "tabs"],
   "host_permissions": ["https://www.facebook.com/ads/library/*"],
+  "optional_host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
       "matches": ["https://www.facebook.com/ads/library/*"],

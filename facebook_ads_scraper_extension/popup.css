@@ -1,5 +1,5 @@
 body {
-  width: 280px;
+  width: 320px;
   font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   padding: 16px;
   margin: 0;
@@ -151,4 +151,20 @@ button.secondary {
 
 .status.success {
   color: #1a7a3d;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid #e4e6eb;
+  margin: 14px 0;
+}
+
+.checkbox-option {
+  margin-top: 8px;
+  align-items: flex-start;
+  line-height: 1.35;
+}
+
+.checkbox-option input[type="checkbox"] {
+  margin-top: 2px;
 }
