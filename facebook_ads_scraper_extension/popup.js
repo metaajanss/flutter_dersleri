@@ -155,14 +155,49 @@ startBtn.addEventListener("click", async () => {
     },
   });
 
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab && tab.url && tab.url.startsWith("https://www.facebook.com/ads/library")) {
-    await chrome.tabs.update(tab.id, { url });
-  } else {
-    await chrome.tabs.create({ url });
+  // Otomasyon, kendi ayrı penceresinde çalışır. Böylece kullanıcı başka bir
+  // sekmeye/pencereye geçse bile bu pencere "görünür" (visible) sayılmaya
+  // devam eder; Chrome ve Facebook, yalnızca seçili olmayan bir SEKMEYİ
+  // (aynı pencere içinde başka sekmeye geçildiğinde) veya küçültülmüş bir
+  // pencereyi "arka planda" kabul edip zamanlayıcıları/içerik yüklemeyi
+  // durdurur. Ayrı pencere odak dışı kalsa bile bu kısıtlamaya girmez.
+  const existing = await chrome.storage.local.get("fbAdsAutoWindowId");
+  let reused = false;
+
+  if (existing.fbAdsAutoWindowId) {
+    try {
+      await chrome.windows.get(existing.fbAdsAutoWindowId);
+      await chrome.windows.update(existing.fbAdsAutoWindowId, {
+        state: "normal",
+        focused: true,
+      });
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        windowId: existing.fbAdsAutoWindowId,
+      });
+      if (tab) {
+        await chrome.tabs.update(tab.id, { url });
+        reused = true;
+      }
+    } catch (e) {
+      // Pencere artık yok; aşağıda yeni bir tane açılacak.
+    }
   }
 
-  showStatus("Arama başlatıldı, otomatik kaydırma çalışacak.", "success");
+  if (!reused) {
+    const win = await chrome.windows.create({
+      url,
+      type: "normal",
+      focused: true,
+    });
+    await chrome.storage.local.set({ fbAdsAutoWindowId: win.id });
+  }
+
+  showStatus(
+    "Arama başlatıldı. Bu pencereyi küçültmeden arkada bırakabilir, başka " +
+      "sekme/pencerede çalışmaya devam edebilirsiniz.",
+    "success"
+  );
   await refreshAutoStatus();
 });
 

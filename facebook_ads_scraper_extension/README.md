@@ -20,10 +20,21 @@ tek tıkla Excel (.xlsx) dosyası olarak dışa aktarır.
    (adet girerek) seçin.
 3. **Aramayı Başlat ve Topla** butonuna basın: eklenti otomatik olarak
    `facebook.com/ads/library` üzerinde aktif reklamlar için o anahtar
-   kelimeyle arama açar ve sayfayı kendi kendine aşağı kaydırmaya başlar.
+   kelimeyle arama açar (**ayrı bir pencerede**) ve sayfayı kendi kendine
+   aşağı kaydırmaya başlar.
 4. Kaydırma arka planda devam eder (popup'ı kapatsanız bile durmaz).
    Popup'ı tekrar açtığınızda güncel "toplanan / hedef" durumunu görürsünüz.
    İstediğiniz an **Otomasyonu Durdur** ile durdurabilirsiniz.
+
+   **⚠️ Önemli — tarayıcı kısıtlaması:** Chrome, seçili olmayan sekmelerde
+   (aynı pencerede başka sekmeye geçtiğinizde) ve küçültülmüş pencerelerde
+   JavaScript zamanlayıcılarını durdurur; Facebook da sayfa görünür değilken
+   yeni reklam yüklemeyi keser. Bu yüzden otomasyon **ayrı bir pencerede**
+   çalışır — o pencereyi **küçültmeden** arkada/kenarda bırakıp başka bir
+   pencerede (veya sekmede, farklı bir Chrome penceresinde) çalışmaya devam
+   edebilirsiniz; otomasyon durmaz. Ancak o pencereyi küçültürseniz veya
+   içindeki sekmeyi değiştirirseniz kaydırma duracaktır — bu Chrome/Facebook
+   kaynaklı bir davranıştır, eklenti tarafından aşılamaz.
 5. "Tüm sonuçları çek" seçiliyse, art arda birkaç kaydırmada yeni reklam
    veren gelmeyince (sayfanın sonuna gelindiği anlaşılınca) otomasyon kendi
    kendine durur. "Belirli adet" seçiliyse hedef adede ulaşınca durur.
