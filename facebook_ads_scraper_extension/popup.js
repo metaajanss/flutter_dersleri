@@ -139,31 +139,14 @@ startBtn.addEventListener("click", async () => {
 
   const url = buildAdsLibraryUrl(keyword);
 
-  await chrome.storage.local.set({
-    [AUTO_CONFIG_KEY]: {
-      keyword,
-      mode,
-      targetCount: mode === "count" ? targetCount : 0,
-      running: true,
-      startedAt: Date.now(),
-    },
-    [AUTO_STATUS_KEY]: {
-      running: true,
-      finished: false,
-      collected: 0,
-      target: mode === "count" ? targetCount : null,
-      reason: "",
-    },
-  });
-
-  // Otomasyon, kendi ayrı penceresinde çalışır. Böylece kullanıcı başka bir
-  // sekmeye/pencereye geçse bile bu pencere "görünür" (visible) sayılmaya
-  // devam eder; Chrome ve Facebook, yalnızca seçili olmayan bir SEKMEYİ
-  // (aynı pencere içinde başka sekmeye geçildiğinde) veya küçültülmüş bir
-  // pencereyi "arka planda" kabul edip zamanlayıcıları/içerik yüklemeyi
-  // durdurur. Ayrı pencere odak dışı kalsa bile bu kısıtlamaya girmez.
+  // Arama, kendi ayrı penceresinde açılır (dağınıklığı azaltmak için) ama
+  // otomatik kaydırma artık bu pencerenin görünür/odaklı olmasına bağlı
+  // DEĞİL: background.js, chrome.alarms + chrome.scripting.executeScript
+  // ile sekmeyi tabId üzerinden doğrudan tetikler. Bu yüzden sekmeye hiç
+  // bakılmasa, pencere başka bir pencerenin arkasında tamamen kapansa
+  // (occlusion) veya küçültülse bile toplama durmaz.
   const existing = await chrome.storage.local.get("fbAdsAutoWindowId");
-  let reused = false;
+  let tabId = null;
 
   if (existing.fbAdsAutoWindowId) {
     try {
@@ -178,25 +161,46 @@ startBtn.addEventListener("click", async () => {
       });
       if (tab) {
         await chrome.tabs.update(tab.id, { url });
-        reused = true;
+        tabId = tab.id;
       }
     } catch (e) {
       // Pencere artık yok; aşağıda yeni bir tane açılacak.
     }
   }
 
-  if (!reused) {
+  if (tabId === null) {
     const win = await chrome.windows.create({
       url,
       type: "normal",
       focused: true,
     });
     await chrome.storage.local.set({ fbAdsAutoWindowId: win.id });
+    tabId = win.tabs && win.tabs[0] ? win.tabs[0].id : null;
   }
 
+  await chrome.storage.local.set({
+    [AUTO_CONFIG_KEY]: {
+      keyword,
+      mode,
+      targetCount: mode === "count" ? targetCount : 0,
+      running: true,
+      startedAt: Date.now(),
+      tabId,
+      iterations: 0,
+      idleStreak: 0,
+    },
+    [AUTO_STATUS_KEY]: {
+      running: true,
+      finished: false,
+      collected: 0,
+      target: mode === "count" ? targetCount : null,
+      reason: "",
+    },
+  });
+
   showStatus(
-    "Arama başlatıldı. Bu pencereyi küçültmeden arkada bırakabilir, başka " +
-      "sekme/pencerede çalışmaya devam edebilirsiniz.",
+    "Arama başlatıldı. Sekmeye/pencereye bakmasanız, başka bir pencerenin " +
+      "arkasında kalsa bile otomasyon arka planda devam eder.",
     "success"
   );
   await refreshAutoStatus();

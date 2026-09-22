@@ -22,19 +22,22 @@ tek tıkla Excel (.xlsx) dosyası olarak dışa aktarır.
    `facebook.com/ads/library` üzerinde aktif reklamlar için o anahtar
    kelimeyle arama açar (**ayrı bir pencerede**) ve sayfayı kendi kendine
    aşağı kaydırmaya başlar.
-4. Kaydırma arka planda devam eder (popup'ı kapatsanız bile durmaz).
-   Popup'ı tekrar açtığınızda güncel "toplanan / hedef" durumunu görürsünüz.
-   İstediğiniz an **Otomasyonu Durdur** ile durdurabilirsiniz.
+4. Kaydırma arka planda devam eder (popup'ı kapatsanız, başka bir sekmeye/
+   pencereye geçseniz, hatta o pencere tamamen başka bir pencerenin
+   arkasında kalsa bile durmaz). Popup'ı tekrar açtığınızda güncel
+   "toplanan / hedef" durumunu görürsünüz. İstediğiniz an **Otomasyonu
+   Durdur** ile durdurabilirsiniz.
 
-   **⚠️ Önemli — tarayıcı kısıtlaması:** Chrome, seçili olmayan sekmelerde
-   (aynı pencerede başka sekmeye geçtiğinizde) ve küçültülmüş pencerelerde
-   JavaScript zamanlayıcılarını durdurur; Facebook da sayfa görünür değilken
-   yeni reklam yüklemeyi keser. Bu yüzden otomasyon **ayrı bir pencerede**
-   çalışır — o pencereyi **küçültmeden** arkada/kenarda bırakıp başka bir
-   pencerede (veya sekmede, farklı bir Chrome penceresinde) çalışmaya devam
-   edebilirsiniz; otomasyon durmaz. Ancak o pencereyi küçültürseniz veya
-   içindeki sekmeyi değiştirirseniz kaydırma duracaktır — bu Chrome/Facebook
-   kaynaklı bir davranıştır, eklenti tarafından aşılamaz.
+   **Bu nasıl mümkün oluyor?** Kaydırma döngüsü sayfanın kendi
+   JavaScript'i içinde değil, eklentinin arka plan servisinde
+   (`background.js`) çalışır: `chrome.alarms` ile periyodik olarak
+   tetiklenip `chrome.scripting.executeScript` ile doğrudan sekmeye
+   "kaydır ve tara" komutu gönderir. Chrome'un sekme görünürlüğüne bağlı
+   zamanlayıcı kısıtlaması (arka plandaki/görünmeyen sekmelerde
+   `setTimeout`/`requestAnimationFrame`'i durdurması) yalnızca SAYFANIN
+   KENDİ zamanlayıcılarını etkiler; eklentinin dışarıdan tetiklediği tekil
+   komutlar bu kısıtlamaya tabi değildir. Bu yüzden pencereyi hiç
+   görmeseniz de otomasyon ilerlemeye devam eder.
 5. "Tüm sonuçları çek" seçiliyse, art arda birkaç kaydırmada yeni reklam
    veren gelmeyince (sayfanın sonuna gelindiği anlaşılınca) otomasyon kendi
    kendine durur. "Belirli adet" seçiliyse hedef adede ulaşınca durur.
@@ -111,5 +114,14 @@ tutulur.
   sonsuz kaydırması gerçekten bittiyse otomasyon kendini durdurur, ancak çok
   yavaş yüklenen bağlantılarda nadiren erken durabilir — bu durumda sayfayı
   elle biraz kaydırıp yeniden "Aramayı Başlat" ile devam edilebilir.
-- Otomatik kaydırma her adımda ~1.5-2 saniye bekler; çok büyük sonuç
+- Otomatik kaydırma yaklaşık her ~3 saniyede bir adım atar; çok büyük sonuç
   kümelerinde (binlerce reklam) tüm veriyi toplamak zaman alabilir.
+- Kaydırma döngüsü `chrome.alarms` ile 1 dakikanın çok altında bir periyotta
+  çalışır. Chrome normalde alarmları 1 dakikadan sık çalıştırmaya izin
+  vermez; bu kısıtlama yalnızca **paketlenmemiş (geliştirici modunda
+  yüklenmiş) eklentiler** için kaldırılmıştır. Bu eklentiyi Chrome Web
+  Store'a paketleyip yayımlarsanız kaydırma periyodu otomatik olarak
+  1 dakikaya çıkar ve toplama çok yavaşlar — eklenti "Paketlenmemiş öğe
+  yükle" ile kullanılmak üzere tasarlanmıştır.
+- Sekme kapatılırsa veya kaydedilen `tabId` artık geçerli değilse
+  otomasyon kendini otomatik olarak durdurur.
