@@ -1,7 +1,6 @@
 const STORAGE_KEY = "fbAdsLibraryData";
 const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
 const AUTO_STATUS_KEY = "fbAdsAutoStatus";
-const JUMPIX_CONFIG_KEY = "fbAdsJumpixConfig";
 
 const countEl = document.getElementById("count");
 const exportBtn = document.getElementById("exportBtn");
@@ -13,11 +12,6 @@ const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const autoStatusEl = document.getElementById("autoStatus");
 const modeRadios = document.querySelectorAll('input[name="mode"]');
-const jumpixWebhookInput = document.getElementById("jumpixWebhook");
-const jumpixAutoSendCheckbox = document.getElementById("jumpixAutoSend");
-const jumpixSaveBtn = document.getElementById("jumpixSaveBtn");
-const jumpixSendAllBtn = document.getElementById("jumpixSendAllBtn");
-const jumpixStatusEl = document.getElementById("jumpixStatus");
 
 const HEADERS = [
   "Reklam Veren Adı",
@@ -30,7 +24,6 @@ const HEADERS = [
   "Arama Kelimesi",
   "Toplandığı Sayfa",
   "Toplanma Zamanı",
-  "Jumpix'e Gönderildi",
 ];
 
 function recordToRow(record) {
@@ -45,7 +38,6 @@ function recordToRow(record) {
     record.searchKeyword || "",
     record.pageUrl || "",
     record.scrapedAt || "",
-    record.jumpixSent ? "Evet" : "Hayır",
   ];
 }
 
@@ -251,85 +243,8 @@ clearBtn.addEventListener("click", async () => {
   showStatus("Tüm veriler temizlendi.", "success");
 });
 
-function showJumpixStatus(message, kind) {
-  jumpixStatusEl.textContent = message;
-  jumpixStatusEl.className = `status ${kind || ""}`.trim();
-}
-
-async function loadJumpixConfig() {
-  const result = await chrome.storage.local.get(JUMPIX_CONFIG_KEY);
-  const config = result[JUMPIX_CONFIG_KEY];
-  if (config) {
-    jumpixWebhookInput.value = config.webhookUrl || "";
-    jumpixAutoSendCheckbox.checked = !!config.autoSend;
-  }
-}
-
-jumpixSaveBtn.addEventListener("click", async () => {
-  const webhookUrl = jumpixWebhookInput.value.trim();
-  if (!webhookUrl) {
-    showJumpixStatus("Lütfen bir webhook URL'i girin.", "error");
-    return;
-  }
-
-  let origin;
-  try {
-    origin = new URL(webhookUrl).origin + "/*";
-  } catch (err) {
-    showJumpixStatus("Geçersiz URL.", "error");
-    return;
-  }
-
-  try {
-    const granted = await chrome.permissions.request({ origins: [origin] });
-    if (!granted) {
-      showJumpixStatus(
-        "İzin verilmeden bu adrese veri gönderilemez. Tekrar deneyip izin verin.",
-        "error"
-      );
-      return;
-    }
-  } catch (err) {
-    showJumpixStatus("İzin isteği başarısız oldu.", "error");
-    return;
-  }
-
-  await chrome.storage.local.set({
-    [JUMPIX_CONFIG_KEY]: {
-      webhookUrl,
-      autoSend: jumpixAutoSendCheckbox.checked,
-    },
-  });
-
-  showJumpixStatus("Webhook ayarı kaydedildi.", "success");
-});
-
-jumpixSendAllBtn.addEventListener("click", async () => {
-  jumpixSendAllBtn.disabled = true;
-  showJumpixStatus("Gönderiliyor...", "");
-
-  try {
-    const response = await chrome.runtime.sendMessage({ type: "JUMPIX_SEND_ALL" });
-    if (!response || !response.ok) {
-      showJumpixStatus("Gönderim başarısız oldu: " + (response?.error || "bilinmeyen hata"), "error");
-    } else if (response.reason === "no-webhook") {
-      showJumpixStatus("Önce webhook URL'ini kaydedin.", "error");
-    } else {
-      showJumpixStatus(
-        `Gönderildi: ${response.sent}, başarısız: ${response.failed}.`,
-        response.failed ? "error" : "success"
-      );
-    }
-  } catch (err) {
-    showJumpixStatus("Gönderim sırasında hata oluştu.", "error");
-  } finally {
-    jumpixSendAllBtn.disabled = false;
-  }
-});
-
 refreshCount();
 refreshAutoStatus();
-loadJumpixConfig();
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;

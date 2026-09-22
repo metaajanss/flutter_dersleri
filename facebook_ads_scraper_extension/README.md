@@ -45,57 +45,6 @@ Not: Sayfayı manuel olarak `facebook.com/ads/library` adresinde gezinirken
 de (arama başlatmadan) eklenti gördüğü reklamları arka planda otomatik
 tarar — anahtar kelimeli otomatik kaydırma isteğe bağlı bir kolaylıktır.
 
-## Jumpix'e otomatik lead gönderme (webhook)
-
-Toplanan her reklam vereni, Jumpix'in webhook adresine otomatik olarak
-JSON POST ile "lead" gibi gönderebilirsiniz.
-
-1. Popup'ta **Jumpix Webhook URL** kutusuna Jumpix'ten aldığınız webhook
-   adresini yapıştırın.
-2. **Yeni reklam veren bulundukça otomatik olarak Jumpix'e lead gönder**
-   kutucuğunu işaretleyin (isterseniz sadece elle "Şimdi Gönder" ile
-   kullanmak için işaretlemeden de bırakabilirsiniz).
-3. **Webhook Ayarını Kaydet** butonuna basın. Chrome, o adrese veri
-   gönderme izni ister (tarayıcı CORS kısıtlamasını aşmak için bu izin
-   gereklidir) — **İzin Ver**e tıklayın.
-4. Bundan sonra otomatik kaydırma sırasında bulunan **her yeni** (daha önce
-   gönderilmemiş) reklam veren, bulunur bulunmaz Jumpix'e gönderilir.
-5. Daha önce toplanmış ama henüz gönderilmemiş kayıtları toplu göndermek
-   isterseniz **Toplanan Tüm Kayıtları Şimdi Gönder** butonunu kullanın.
-6. Bir kayıt Jumpix'e başarıyla gönderildiğinde `jumpixSent: true` olarak
-   işaretlenir ve **aynı reklam veren için lead bir daha gönderilmez**
-   (aynı tekilleştirme anahtarı — Sayfa ID veya reklam veren adı — kullanılır).
-
-### Gönderilen JSON alanları
-
-Jumpix'in tam olarak hangi alan adlarını beklediğini bilmediğimiz için
-(genel bir API dokümantasyonuna ulaşamadım), her ihtimale karşı yaygın
-CRM/lead alan adlarıyla genel bir JSON gönderiliyor (`background.js` →
-`buildJumpixPayload`):
-
-```json
-{
-  "source": "facebook_ads_library",
-  "name": "Reklam Veren Adı",
-  "lead_name": "Reklam Veren Adı",
-  "company_name": "Reklam Veren Adı",
-  "facebook_page_url": "https://facebook.com/...",
-  "facebook_page_id": "1234567890",
-  "library_id": "9876543210",
-  "ad_status": "Active",
-  "started_running": "20 Sep 2026",
-  "platforms": "Facebook, Instagram",
-  "search_keyword": "spor ayakkabı",
-  "collected_from_page": "https://www.facebook.com/ads/library/?...",
-  "collected_at": "2026-09-21T10:00:00.000Z"
-}
-```
-
-Jumpix webhook'unuz farklı alan adları bekliyorsa (örn. `ad`, `unvan`,
-`firma_adi` gibi), `background.js` içindeki `buildJumpixPayload`
-fonksiyonunu kendi alan adlarınıza göre güncellemeniz yeterlidir — istekle
-birlikte bu eşlemeyi de güncelleyebilirim.
-
 ## Toplanan alanlar
 
 - Reklam Veren Adı

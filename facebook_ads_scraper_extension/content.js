@@ -7,7 +7,6 @@
   const STORAGE_KEY = "fbAdsLibraryData";
   const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
   const AUTO_STATUS_KEY = "fbAdsAutoStatus";
-  const JUMPIX_CONFIG_KEY = "fbAdsJumpixConfig";
   const SEEN_KEYS_IN_MEMORY = new Set(); // bu sekmede zaten işlenmiş kart elemanlarını tutar (WeakSet yerine Set+WeakMap)
   const PROCESSED_ELEMENTS = new WeakSet();
   let scanScheduled = false;
@@ -117,35 +116,24 @@
   }
 
   async function saveRecords(newRecords) {
-    if (newRecords.length === 0) return [];
+    if (newRecords.length === 0) return;
 
     const result = await chrome.storage.local.get(STORAGE_KEY);
     const store = result[STORAGE_KEY] || {};
-    const addedItems = [];
+    let added = 0;
 
     for (const record of newRecords) {
       const key = dedupeKey(record);
       if (!store[key]) {
         store[key] = record;
-        addedItems.push({ key, record });
+        added++;
       }
     }
 
-    if (addedItems.length > 0) {
+    if (added > 0) {
       await chrome.storage.local.set({ [STORAGE_KEY]: store });
       totalCountCache = Object.keys(store).length;
       chrome.runtime.sendMessage({ type: "FB_ADS_COUNT_UPDATED", count: totalCountCache }).catch(() => {});
-    }
-
-    return addedItems;
-  }
-
-  async function maybeAutoSendToJumpix(addedItems) {
-    if (addedItems.length === 0) return;
-    const result = await chrome.storage.local.get(JUMPIX_CONFIG_KEY);
-    const config = result[JUMPIX_CONFIG_KEY];
-    if (config && config.autoSend && config.webhookUrl) {
-      chrome.runtime.sendMessage({ type: "JUMPIX_SEND_RECORDS", items: addedItems }).catch(() => {});
     }
   }
 
@@ -169,10 +157,7 @@
       }
     }
 
-    if (fresh.length > 0) {
-      const added = await saveRecords(fresh);
-      await maybeAutoSendToJumpix(added);
-    }
+    if (fresh.length > 0) await saveRecords(fresh);
   }
 
   function scheduleScan() {
