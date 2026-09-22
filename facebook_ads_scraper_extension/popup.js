@@ -14,9 +14,10 @@ const autoStatusEl = document.getElementById("autoStatus");
 const modeRadios = document.querySelectorAll('input[name="mode"]');
 
 // Jumpix şablonuyla birebir eşleşen sütun sırası. Facebook Ads Library
-// kazıması kişi adı/e-posta/telefon vermediği için first_name, last_name,
-// email, phone alanları boş bırakılıyor; company = reklam veren (sayfa) adı,
-// web_link = sayfa bağlantısı, facebook_ads_library_id = Library ID.
+// kazıması kişi adı/e-posta/telefon vermediği için last_name, email, phone
+// alanları boş bırakılıyor; reklam veren (sayfa) adı hem first_name hem
+// company sütununa, web_link sayfa bağlantısına, facebook_ads_library_id
+// Library ID'ye yazılıyor.
 const HEADERS = [
   "first_name",
   "last_name",
@@ -29,7 +30,7 @@ const HEADERS = [
 
 function recordToRow(record) {
   return [
-    "",
+    record.advertiserName || "",
     "",
     "",
     "",

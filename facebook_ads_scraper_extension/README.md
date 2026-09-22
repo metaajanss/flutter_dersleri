@@ -68,15 +68,16 @@ Dışa aktarılan `.xlsx` dosyası, aşağıdaki sabit şablon sütun sırasıyl
 
 | # | Sütun | Kaynak | Örnek |
 |---|-------|--------|-------|
-| 1 | `first_name` | (boş — FB Ads Library'de kişi adı yok) | |
+| 1 | `first_name` | Reklam veren (sayfa) adı | Example Inc |
 | 2 | `last_name` | (boş) | |
-| 3 | `email` | (boş) | |
+| 3 | `email` | (boş — FB Ads Library'de e-posta yok) | |
 | 4 | `phone` | (boş) | |
 | 5 | `company` | Reklam veren (sayfa) adı | Example Inc |
 | 6 | `web_link` | Sayfa bağlantısı | https://example.com |
 | 7 | `facebook_ads_library_id` | Library ID | 123456789012345 |
 
-`first_name`, `last_name`, `email`, `phone` sütunları Facebook Ads
+Reklam veren (sayfa) adı hem `first_name` hem `company` sütununa
+yazılır. `last_name`, `email`, `phone` sütunları Facebook Ads
 Library'nin sağlamadığı bilgiler olduğu için boş bırakılır; dışa
 aktarılan dosyada bu sütunlar CRM'e elle veya başka bir kaynaktan
 doldurulmak üzere yer tutar.
