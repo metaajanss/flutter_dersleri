@@ -13,31 +13,29 @@ const stopBtn = document.getElementById("stopBtn");
 const autoStatusEl = document.getElementById("autoStatus");
 const modeRadios = document.querySelectorAll('input[name="mode"]');
 
+// Jumpix şablonuyla birebir eşleşen sütun sırası. Facebook Ads Library
+// kazıması kişi adı/e-posta/telefon vermediği için first_name, last_name,
+// email, phone alanları boş bırakılıyor; company = reklam veren (sayfa) adı,
+// web_link = sayfa bağlantısı, facebook_ads_library_id = Library ID.
 const HEADERS = [
-  "Reklam Veren Adı",
-  "Sayfa Bağlantısı",
-  "Sayfa ID",
-  "Library ID",
-  "Durum",
-  "Başlangıç Tarihi",
-  "Platformlar",
-  "Arama Kelimesi",
-  "Toplandığı Sayfa",
-  "Toplanma Zamanı",
+  "first_name",
+  "last_name",
+  "email",
+  "phone",
+  "company",
+  "web_link",
+  "facebook_ads_library_id",
 ];
 
 function recordToRow(record) {
   return [
+    "",
+    "",
+    "",
+    "",
     record.advertiserName || "",
     record.advertiserUrl || "",
-    record.pageId || "",
     record.libraryId || "",
-    record.status || "",
-    record.startedRunning || "",
-    record.platforms || "",
-    record.searchKeyword || "",
-    record.pageUrl || "",
-    record.scrapedAt || "",
   ];
 }
 

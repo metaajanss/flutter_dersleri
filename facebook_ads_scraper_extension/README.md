@@ -45,7 +45,10 @@ Not: Sayfayı manuel olarak `facebook.com/ads/library` adresinde gezinirken
 de (arama başlatmadan) eklenti gördüğü reklamları arka planda otomatik
 tarar — anahtar kelimeli otomatik kaydırma isteğe bağlı bir kolaylıktır.
 
-## Toplanan alanlar
+## Toplanan alanlar (dahili depolama)
+
+Eklenti, sayfayı tararken her reklam veren için şu bilgileri toplayıp
+tarayıcı içinde saklar:
 
 - Reklam Veren Adı
 - Sayfa Bağlantısı (facebook.com/... profil linki)
@@ -54,8 +57,29 @@ tarar — anahtar kelimeli otomatik kaydırma isteğe bağlı bir kolaylıktır.
 - Durum (Active/Inactive)
 - Başlangıç Tarihi ("Started running on ...")
 - Platformlar
+- Aranan anahtar kelime
 - Toplandığı sayfanın URL'si
 - Toplanma zamanı
+
+## Excel export şablonu
+
+Dışa aktarılan `.xlsx` dosyası, aşağıdaki sabit şablon sütun sırasıyla
+üretilir:
+
+| # | Sütun | Kaynak | Örnek |
+|---|-------|--------|-------|
+| 1 | `first_name` | (boş — FB Ads Library'de kişi adı yok) | |
+| 2 | `last_name` | (boş) | |
+| 3 | `email` | (boş) | |
+| 4 | `phone` | (boş) | |
+| 5 | `company` | Reklam veren (sayfa) adı | Example Inc |
+| 6 | `web_link` | Sayfa bağlantısı | https://example.com |
+| 7 | `facebook_ads_library_id` | Library ID | 123456789012345 |
+
+`first_name`, `last_name`, `email`, `phone` sütunları Facebook Ads
+Library'nin sağlamadığı bilgiler olduğu için boş bırakılır; dışa
+aktarılan dosyada bu sütunlar CRM'e elle veya başka bir kaynaktan
+doldurulmak üzere yer tutar.
 
 ## Tekilleştirme mantığı
 
