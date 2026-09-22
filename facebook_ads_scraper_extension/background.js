@@ -37,11 +37,25 @@ async function getCollectedCount() {
   return Object.keys(result[STORAGE_KEY] || {}).length;
 }
 
+// Badge, tabId VERİLMEDEN ayarlanır ki kullanıcı başka bir sekmedeyken de
+// araç çubuğu simgesinde ilerleme görünsün (tabId verilseydi yalnızca o
+// sekme aktifken görünürdü — tam da kullanıcının bakmadığı senaryoda işe
+// yaramazdı).
+function updateBadge(text, color) {
+  chrome.action.setBadgeText({ text: String(text) });
+  if (color) chrome.action.setBadgeBackgroundColor({ color });
+}
+
+function clearBadge() {
+  chrome.action.setBadgeText({ text: "" });
+}
+
 async function stopAutomation(reason) {
   await chrome.alarms.clear(TICK_ALARM);
   await patchAutoConfig({ running: false });
   const collected = await getCollectedCount();
   await setAutoStatus({ running: false, finished: true, collected, reason });
+  clearBadge();
 }
 
 async function startTicking() {
@@ -89,6 +103,7 @@ async function tick() {
     target: config.mode === "count" ? config.targetCount : null,
     reason: "",
   });
+  updateBadge(after, "#1877F2");
 
   if (config.mode === "count" && after >= config.targetCount) {
     await stopAutomation("hedef adede ulaşıldı");
@@ -154,6 +169,7 @@ async function stopEnrichment(reason) {
     found: config ? config.found : 0,
     reason,
   });
+  clearBadge();
 }
 
 function extractContactInfoFromPage() {
@@ -243,6 +259,8 @@ async function enrichTick() {
     found,
     reason: "",
   });
+  // Kalan kayıt sayısını badge'de gösterir (ör. "K12" = 12 kayıt kaldı).
+  updateBadge(`K${Math.max(config.total - processed, 0)}`, "#f5a623");
 
   if (config.queue.length === 0) {
     await stopEnrichment("tüm kayıtlar işlendi");
@@ -296,11 +314,10 @@ chrome.runtime.onStartup.addListener(async () => {
   }
 });
 
-// Reklam sayısı değiştikçe action badge'ini günceller.
-chrome.runtime.onMessage.addListener((message, sender) => {
+// Reklam sayısı değiştikçe action badge'ini günceller (manuel gezinme
+// sırasında da). tabId VERİLMEZ ki başka bir sekmedeyken de görünsün.
+chrome.runtime.onMessage.addListener((message) => {
   if (message && message.type === "FB_ADS_COUNT_UPDATED") {
-    const tabId = sender.tab && sender.tab.id;
-    chrome.action.setBadgeText({ text: String(message.count), tabId });
-    chrome.action.setBadgeBackgroundColor({ color: "#1877F2", tabId });
+    updateBadge(message.count, "#1877F2");
   }
 });

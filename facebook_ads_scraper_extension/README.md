@@ -20,13 +20,18 @@ tek tıkla Excel (.xlsx) dosyası olarak dışa aktarır.
    (adet girerek) seçin.
 3. **Aramayı Başlat ve Topla** butonuna basın: eklenti otomatik olarak
    `facebook.com/ads/library` üzerinde aktif reklamlar için o anahtar
-   kelimeyle arama açar (**ayrı bir pencerede**) ve sayfayı kendi kendine
-   aşağı kaydırmaya başlar.
+   kelimeyle arama açar (**ayrı, küçültülmüş bir pencerede** — ekranınıza
+   çıkmaz, odağınızı almaz) ve sayfayı kendi kendine aşağı kaydırmaya
+   başlar.
 4. Kaydırma arka planda devam eder (popup'ı kapatsanız, başka bir sekmeye/
    pencereye geçseniz, hatta o pencere tamamen başka bir pencerenin
-   arkasında kalsa bile durmaz). Popup'ı tekrar açtığınızda güncel
-   "toplanan / hedef" durumunu görürsünüz. İstediğiniz an **Otomasyonu
-   Durdur** ile durdurabilirsiniz.
+   arkasında kalsa bile durmaz). İlerlemeyi iki yerden takip edebilirsiniz:
+   - **Araç çubuğundaki eklenti simgesinin rozeti (badge)**: toplama
+     sırasında toplanan sayıyı, zenginleştirme sırasında kalan kayıt
+     sayısını (`K12` gibi) her an gösterir — popup'ı açmanıza gerek yok.
+   - **Popup'ı tekrar açtığınızda**: "Toplanan/Hedef · Kalan" bilgisini ve
+     bir ilerleme çubuğunu görürsünüz. İstediğiniz an **Otomasyonu
+     Durdur** ile durdurabilirsiniz.
 
    **Bu nasıl mümkün oluyor?** Kaydırma döngüsü sayfanın kendi
    JavaScript'i içinde değil, eklentinin arka plan servisinde

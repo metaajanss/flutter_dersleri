@@ -81,6 +81,21 @@ h1 {
   border-color: #b7dfc0;
 }
 
+.progress-bar {
+  margin-top: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #1877f2;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
 .stat {
   text-align: center;
   background: #f0f2f5;

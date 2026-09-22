@@ -92,6 +92,29 @@ function updateModeUi() {
   countInput.disabled = currentMode() !== "count";
 }
 
+// Bir durum kutusuna (autoStatusEl / enrichStatusEl) etiket metni ve
+// isteğe bağlı bir ilerleme çubuğu çizer. innerHTML yerine DOM
+// düğümleriyle oluşturulur (basit ama güvenli).
+function setStatusBox(el, label, percent, extraClass) {
+  el.hidden = false;
+  el.className = `auto-status ${extraClass || ""}`.trim();
+  el.textContent = "";
+
+  const labelEl = document.createElement("div");
+  labelEl.textContent = label;
+  el.appendChild(labelEl);
+
+  if (percent !== null) {
+    const bar = document.createElement("div");
+    bar.className = "progress-bar";
+    const fill = document.createElement("div");
+    fill.className = "progress-bar-fill";
+    fill.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+    bar.appendChild(fill);
+    el.appendChild(bar);
+  }
+}
+
 function renderAutoStatus(status, config) {
   if (!status) {
     autoStatusEl.hidden = true;
@@ -100,19 +123,31 @@ function renderAutoStatus(status, config) {
     return;
   }
 
-  const targetLabel =
-    config && config.mode === "count" ? `${config.targetCount} adet` : "tüm sonuçlar";
+  const isCountMode = config && config.mode === "count";
 
   if (status.running) {
-    autoStatusEl.hidden = false;
-    autoStatusEl.className = "auto-status";
-    autoStatusEl.textContent = `Otomatik kaydırma çalışıyor... Toplanan: ${status.collected} / Hedef: ${targetLabel}`;
+    let label;
+    let percent = null;
+
+    if (isCountMode) {
+      const remaining = Math.max((config.targetCount || 0) - status.collected, 0);
+      percent = config.targetCount ? (status.collected / config.targetCount) * 100 : 0;
+      label = `Otomatik kaydırma çalışıyor... Toplanan: ${status.collected}/${config.targetCount} · Kalan: ${remaining}`;
+    } else {
+      const idleStreak = (config && config.idleStreak) || 0;
+      label = `Otomatik kaydırma çalışıyor... Toplanan: ${status.collected} · Yeni sonuç gelmezse durur: ${idleStreak}/6 dener`;
+    }
+
+    setStatusBox(autoStatusEl, label, percent);
     startBtn.hidden = true;
     stopBtn.hidden = false;
   } else if (status.finished) {
-    autoStatusEl.hidden = false;
-    autoStatusEl.className = "auto-status finished";
-    autoStatusEl.textContent = `Tamamlandı (${status.reason || ""}). Toplanan: ${status.collected}.`;
+    setStatusBox(
+      autoStatusEl,
+      `Tamamlandı (${status.reason || ""}). Toplanan: ${status.collected}.`,
+      null,
+      "finished"
+    );
     startBtn.hidden = false;
     stopBtn.hidden = true;
   } else {
@@ -146,12 +181,11 @@ startBtn.addEventListener("click", async () => {
 
   const url = buildAdsLibraryUrl(keyword);
 
-  // Arama, kendi ayrı penceresinde açılır (dağınıklığı azaltmak için) ama
-  // otomatik kaydırma artık bu pencerenin görünür/odaklı olmasına bağlı
-  // DEĞİL: background.js, chrome.alarms + chrome.scripting.executeScript
-  // ile sekmeyi tabId üzerinden doğrudan tetikler. Bu yüzden sekmeye hiç
-  // bakılmasa, pencere başka bir pencerenin arkasında tamamen kapansa
-  // (occlusion) veya küçültülse bile toplama durmaz.
+  // Arama, kendi ayrı penceresinde açılır ama artık görünmeden/odağı
+  // çalmadan (küçültülmüş) çalışıyor: background.js, chrome.alarms +
+  // chrome.scripting.executeScript ile sekmeyi tabId üzerinden doğrudan
+  // tetikler. Bu yüzden pencerenin görünür, odaklı, hatta küçültülmemiş
+  // olmasına bile gerek yok — sekmeye hiç bakılmasa da toplama durmaz.
   const existing = await chrome.storage.local.get("fbAdsAutoWindowId");
   let tabId = null;
 
@@ -159,8 +193,7 @@ startBtn.addEventListener("click", async () => {
     try {
       await chrome.windows.get(existing.fbAdsAutoWindowId);
       await chrome.windows.update(existing.fbAdsAutoWindowId, {
-        state: "normal",
-        focused: true,
+        state: "minimized",
       });
       const [tab] = await chrome.tabs.query({
         active: true,
@@ -179,7 +212,8 @@ startBtn.addEventListener("click", async () => {
     const win = await chrome.windows.create({
       url,
       type: "normal",
-      focused: true,
+      focused: false,
+      state: "minimized",
     });
     await chrome.storage.local.set({ fbAdsAutoWindowId: win.id });
     tabId = win.tabs && win.tabs[0] ? win.tabs[0].id : null;
@@ -267,15 +301,22 @@ function renderEnrichStatus(status) {
   }
 
   if (status.running) {
-    enrichStatusEl.hidden = false;
-    enrichStatusEl.className = "auto-status";
-    enrichStatusEl.textContent = `Zenginleştiriliyor... İşlenen: ${status.processed}/${status.total} · Bulunan: ${status.found}`;
+    const remaining = Math.max((status.total || 0) - status.processed, 0);
+    const percent = status.total ? (status.processed / status.total) * 100 : 0;
+    setStatusBox(
+      enrichStatusEl,
+      `Zenginleştiriliyor... İşlenen: ${status.processed}/${status.total} · Kalan: ${remaining} · Bulunan: ${status.found}`,
+      percent
+    );
     enrichBtn.hidden = true;
     enrichStopBtn.hidden = false;
   } else if (status.finished) {
-    enrichStatusEl.hidden = false;
-    enrichStatusEl.className = "auto-status finished";
-    enrichStatusEl.textContent = `Tamamlandı (${status.reason || ""}). İşlenen: ${status.processed}/${status.total} · Bulunan: ${status.found}`;
+    setStatusBox(
+      enrichStatusEl,
+      `Tamamlandı (${status.reason || ""}). İşlenen: ${status.processed}/${status.total} · Bulunan: ${status.found}`,
+      null,
+      "finished"
+    );
     enrichBtn.hidden = false;
     enrichStopBtn.hidden = true;
   } else {
@@ -323,9 +364,16 @@ enrichBtn.addEventListener("click", async () => {
       url: "https://www.facebook.com/",
       type: "normal",
       focused: false,
+      state: "minimized",
     });
     await chrome.storage.local.set({ fbAdsEnrichWindowId: win.id });
     tabId = win.tabs && win.tabs[0] ? win.tabs[0].id : null;
+  } else {
+    try {
+      await chrome.windows.update(existing.fbAdsEnrichWindowId, { state: "minimized" });
+    } catch (e) {
+      // önemli değil
+    }
   }
 
   await chrome.storage.local.set({
