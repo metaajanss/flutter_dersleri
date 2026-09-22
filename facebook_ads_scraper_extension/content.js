@@ -78,9 +78,25 @@
     });
 
     const advertiserName = advertiserLink ? textOf(advertiserLink) : null;
-    const advertiserUrl = advertiserLink ? advertiserLink.href.split("?")[0] : "";
+    const advertiserUrl = advertiserLink ? cleanFacebookUrl(advertiserLink.href) : "";
 
     return { advertiserName, advertiserUrl, pageId };
+  }
+
+  // "profile.php?id=..." biçimindeki sayfalarda id parametresi sayfanın
+  // kimliğidir ve silinirse link kırılır; diğer linklerde ise sorgu
+  // parametreleri (izleme vb.) gereksizdir ve atılır.
+  function cleanFacebookUrl(href) {
+    try {
+      const u = new URL(href);
+      if (u.pathname.includes("profile.php")) {
+        const id = u.searchParams.get("id");
+        return id ? `${u.origin}${u.pathname}?id=${id}` : `${u.origin}${u.pathname}`;
+      }
+      return `${u.origin}${u.pathname}`;
+    } catch (e) {
+      return href.split("?")[0];
+    }
   }
 
   function extractAdData(card, keyword) {

@@ -48,6 +48,40 @@ Not: Sayfayı manuel olarak `facebook.com/ads/library` adresinde gezinirken
 de (arama başlatmadan) eklenti gördüğü reklamları arka planda otomatik
 tarar — anahtar kelimeli otomatik kaydırma isteğe bağlı bir kolaylıktır.
 
+## Zenginleştirme: e-posta/telefon bulma
+
+Toplama bittikten sonra **Zenginleştir (E-posta/Telefon Bul)** butonuna
+basarsanız, eklenti toplanan her reklam verenin Facebook sayfasındaki
+**"İletişim ve Temel Bilgiler"** (`about_contact_and_basic_info`)
+bölümüne sırayla gider ve orada herkese açık olarak görünen e-posta/
+telefon varsa çeker:
+
+1. Önce sayfadaki `mailto:` / `tel:` linklerine bakar (en güvenilir kaynak).
+2. Bulamazsa sayfa metninde basit bir e-posta/telefon deseni arar.
+3. Bilgi bulunamazsa (çoğu sayfa bu bilgiyi paylaşmaz) ilgili hücreler boş
+   kalır — bu normaldir.
+
+Bu işlem, **sizin zaten giriş yapmış olduğunuz tarayıcı oturumunuzla**
+sayfaları ziyaret ederek çalışır (tıpkı sizin o sayfaları elle
+ziyaret etmeniz gibi); eklenti başka bir hesaba giriş yapmaz, şifre
+istemez, gizli/özel bilgiye erişmez — yalnızca sayfanın herkese açık
+gösterdiği bilgiyi okur.
+
+Zenginleştirme de arama otomasyonuyla aynı `chrome.alarms` +
+`chrome.scripting.executeScript` mekanizmasını kullanır (kendi ayrı
+penceresinde), bu yüzden o pencereye bakmasanız da arka planda ilerler.
+Bulunan e-posta/telefon, Excel export şablonundaki `email`/`phone`
+sütunlarına otomatik olarak yazılır. **Zenginleştirmeyi Durdur** ile
+istediğiniz an durdurabilir, kalan kayıtları daha sonra tekrar
+**Zenginleştir**'e basarak kaldığı yerden (zaten işlenmiş kayıtları
+atlayarak) devam ettirebilirsiniz.
+
+⚠️ Bu, Facebook'un normalde tek tek elle yapacağınız bir gezinmeyi
+otomatikleştirir; çok sayıda sayfayı hızlı art arda ziyaret etmek
+Facebook'un hız sınırlama/otomasyon tespiti mekanizmalarını
+tetikleyebilir. Büyük listelerde makul aralıklarla (varsayılan ~5
+saniye/sayfa) çalıştırmanız ve gerekirse ara vermeniz önerilir.
+
 ## Toplanan alanlar (dahili depolama)
 
 Eklenti, sayfayı tararken her reklam veren için şu bilgileri toplayıp
@@ -73,8 +107,8 @@ Dışa aktarılan `.xlsx` dosyası, aşağıdaki sabit şablon sütun sırasıyl
 |---|-------|--------|-------|
 | 1 | `first_name` | Reklam veren (sayfa) adı | Example Inc |
 | 2 | `last_name` | (boş) | |
-| 3 | `email` | (boş — FB Ads Library'de e-posta yok) | |
-| 4 | `phone` | (boş) | |
+| 3 | `email` | "Zenginleştir" ile bulunursa, yoksa boş | ornek@firma.com |
+| 4 | `phone` | "Zenginleştir" ile bulunursa, yoksa boş | +90 555 555 55 55 |
 | 5 | `company` | Reklam veren (sayfa) adı | Example Inc |
 | 6 | `web_link` | Sayfa bağlantısı | https://example.com |
 | 7 | `facebook_ads_library_id` | Library ID | 123456789012345 |

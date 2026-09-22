@@ -1,6 +1,8 @@
 const STORAGE_KEY = "fbAdsLibraryData";
 const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
 const AUTO_STATUS_KEY = "fbAdsAutoStatus";
+const ENRICH_CONFIG_KEY = "fbAdsEnrichConfig";
+const ENRICH_STATUS_KEY = "fbAdsEnrichStatus";
 
 const countEl = document.getElementById("count");
 const exportBtn = document.getElementById("exportBtn");
@@ -12,12 +14,17 @@ const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const autoStatusEl = document.getElementById("autoStatus");
 const modeRadios = document.querySelectorAll('input[name="mode"]');
+const enrichBtn = document.getElementById("enrichBtn");
+const enrichStopBtn = document.getElementById("enrichStopBtn");
+const enrichStatusEl = document.getElementById("enrichStatus");
+const enrichStatusMsgEl = document.getElementById("enrichStatusMsg");
 
-// Jumpix şablonuyla birebir eşleşen sütun sırası. Facebook Ads Library
-// kazıması kişi adı/e-posta/telefon vermediği için last_name, email, phone
-// alanları boş bırakılıyor; reklam veren (sayfa) adı hem first_name hem
-// company sütununa, web_link sayfa bağlantısına, facebook_ads_library_id
-// Library ID'ye yazılıyor.
+// Jumpix şablonuyla birebir eşleşen sütun sırası. last_name FB Ads
+// Library'nin sağlamadığı bir bilgi olduğu için boş bırakılıyor;
+// email/phone "Zenginleştir" ile dolduysa dolu, değilse boş gider.
+// Reklam veren (sayfa) adı hem first_name hem company sütununa,
+// web_link sayfa bağlantısına, facebook_ads_library_id Library ID'ye
+// yazılıyor.
 const HEADERS = [
   "first_name",
   "last_name",
@@ -32,8 +39,8 @@ function recordToRow(record) {
   return [
     record.advertiserName || "",
     "",
-    "",
-    "",
+    record.email || "",
+    record.phone || "",
     record.advertiserName || "",
     record.advertiserUrl || "",
     record.libraryId || "",
@@ -246,11 +253,124 @@ clearBtn.addEventListener("click", async () => {
   showStatus("Tüm veriler temizlendi.", "success");
 });
 
+function showEnrichMsg(message, kind) {
+  enrichStatusMsgEl.textContent = message;
+  enrichStatusMsgEl.className = `status ${kind || ""}`.trim();
+}
+
+function renderEnrichStatus(status) {
+  if (!status) {
+    enrichStatusEl.hidden = true;
+    enrichBtn.hidden = false;
+    enrichStopBtn.hidden = true;
+    return;
+  }
+
+  if (status.running) {
+    enrichStatusEl.hidden = false;
+    enrichStatusEl.className = "auto-status";
+    enrichStatusEl.textContent = `Zenginleştiriliyor... İşlenen: ${status.processed}/${status.total} · Bulunan: ${status.found}`;
+    enrichBtn.hidden = true;
+    enrichStopBtn.hidden = false;
+  } else if (status.finished) {
+    enrichStatusEl.hidden = false;
+    enrichStatusEl.className = "auto-status finished";
+    enrichStatusEl.textContent = `Tamamlandı (${status.reason || ""}). İşlenen: ${status.processed}/${status.total} · Bulunan: ${status.found}`;
+    enrichBtn.hidden = false;
+    enrichStopBtn.hidden = true;
+  } else {
+    enrichStatusEl.hidden = true;
+    enrichBtn.hidden = false;
+    enrichStopBtn.hidden = true;
+  }
+}
+
+async function refreshEnrichStatus() {
+  const result = await chrome.storage.local.get(ENRICH_STATUS_KEY);
+  renderEnrichStatus(result[ENRICH_STATUS_KEY]);
+}
+
+enrichBtn.addEventListener("click", async () => {
+  const records = await chrome.storage.local.get(STORAGE_KEY);
+  const store = records[STORAGE_KEY] || {};
+  const keys = Object.keys(store).filter((key) => !store[key].enrichedAt && store[key].advertiserUrl);
+
+  if (keys.length === 0) {
+    showEnrichMsg("Zenginleştirilecek yeni kayıt yok (liste boş ya da hepsi zaten işlendi).", "error");
+    return;
+  }
+
+  // Zenginleştirme, arama otomasyonundan ayrı, kendi penceresinde çalışır
+  // ki ikisi aynı anda çalışırken birbirinin sekmesini ele geçirmesin.
+  const existing = await chrome.storage.local.get("fbAdsEnrichWindowId");
+  let tabId = null;
+
+  if (existing.fbAdsEnrichWindowId) {
+    try {
+      await chrome.windows.get(existing.fbAdsEnrichWindowId);
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        windowId: existing.fbAdsEnrichWindowId,
+      });
+      if (tab) tabId = tab.id;
+    } catch (e) {
+      // Pencere artık yok; aşağıda yeni bir tane açılacak.
+    }
+  }
+
+  if (tabId === null) {
+    const win = await chrome.windows.create({
+      url: "https://www.facebook.com/",
+      type: "normal",
+      focused: false,
+    });
+    await chrome.storage.local.set({ fbAdsEnrichWindowId: win.id });
+    tabId = win.tabs && win.tabs[0] ? win.tabs[0].id : null;
+  }
+
+  await chrome.storage.local.set({
+    [ENRICH_CONFIG_KEY]: {
+      running: true,
+      tabId,
+      queue: keys,
+      phase: "navigate",
+      currentKey: null,
+      processed: 0,
+      found: 0,
+      total: keys.length,
+    },
+    [ENRICH_STATUS_KEY]: {
+      running: true,
+      finished: false,
+      processed: 0,
+      total: keys.length,
+      found: 0,
+      reason: "",
+    },
+  });
+
+  showEnrichMsg(`Zenginleştirme başlatıldı: ${keys.length} kayıt işlenecek.`, "success");
+  await refreshEnrichStatus();
+});
+
+enrichStopBtn.addEventListener("click", async () => {
+  const result = await chrome.storage.local.get(ENRICH_CONFIG_KEY);
+  const config = result[ENRICH_CONFIG_KEY];
+  if (config) {
+    await chrome.storage.local.set({
+      [ENRICH_CONFIG_KEY]: { ...config, running: false },
+    });
+  }
+  showEnrichMsg("Zenginleştirme durduruluyor...", "success");
+});
+
 refreshCount();
 refreshAutoStatus();
+refreshEnrichStatus();
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes[STORAGE_KEY]) refreshCount();
   if (changes[AUTO_STATUS_KEY] || changes[AUTO_CONFIG_KEY]) refreshAutoStatus();
+  if (changes[ENRICH_STATUS_KEY]) refreshEnrichStatus();
 });

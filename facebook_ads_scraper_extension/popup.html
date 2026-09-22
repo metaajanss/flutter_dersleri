@@ -48,18 +48,33 @@
 
   <p id="status" class="status"></p>
 
+  <hr class="divider" />
+
+  <div class="actions">
+    <button id="enrichBtn" class="secondary">Zenginleştir (E-posta/Telefon Bul)</button>
+    <button id="enrichStopBtn" class="secondary" hidden>Zenginleştirmeyi Durdur</button>
+  </div>
+
+  <div id="enrichStatus" class="auto-status" hidden></div>
+
+  <p id="enrichStatusMsg" class="status"></p>
+
+  <p class="hint">
+    Toplanan her reklam verenin Facebook sayfasındaki "İletişim ve Temel
+    Bilgiler" bölümüne sırayla gidip herkese açık e-posta/telefon varsa
+    çeker (mailto/tel linkleri ve sayfa metni taranır). Sayfada bu bilgiler
+    yoksa veya gizliyse boş kalır — bu durum Facebook'a, kendi giriş yapmış
+    tarayıcı oturumunuzla erişildiği için normaldir, eklenti hesabınıza
+    giriş yapmaz veya gizli bilgiye erişmez.
+  </p>
+
   <p class="hint">
     Anahtar kelimeyi girip "Aramayı Başlat ve Topla"ya bastığında, aktif
     reklamlar için Facebook Ads Library <strong>ayrı bir pencerede</strong>
     açılır ve sayfa otomatik olarak aşağı kaydırılarak tüm reklam verenler
     (veya seçtiğin adet kadarı) toplanır. Aynı reklam veren tekrar
-    kaydedilmez.
-    <br /><br />
-    <strong>Önemli:</strong> Bu pencereyi <strong>küçültmeyin</strong>
-    (minimize etmeyin) — küçültülmüş veya farklı bir sekmeye geçilmiş
-    pencerelerde tarayıcı işlemleri durdurur. Pencereyi arkada/kenarda
-    bırakıp başka bir pencerede çalışmaya devam edebilirsiniz, otomasyon
-    yine de ilerler.
+    kaydedilmez. Bu pencereye/sekmeye bakmasanız, hatta başka bir pencere
+    onu tamamen kapatsa bile toplama arka planda devam eder.
   </p>
 
   <script src="xlsx-writer.js"></script>

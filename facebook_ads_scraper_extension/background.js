@@ -14,6 +14,10 @@ const TICK_ALARM = "fbAdsAutoTick";
 const MAX_IDLE_STREAK = 6; // art arda bu kadar taramada yeni reklam veren gelmezse sonuna gelinmiş sayılır
 const MAX_ITERATIONS = 4000; // sonsuz döngüye karşı güvenlik sınırı
 
+const ENRICH_CONFIG_KEY = "fbAdsEnrichConfig";
+const ENRICH_STATUS_KEY = "fbAdsEnrichStatus";
+const ENRICH_ALARM = "fbAdsEnrichTick";
+
 async function getAutoConfig() {
   const result = await chrome.storage.local.get(AUTO_CONFIG_KEY);
   return result[AUTO_CONFIG_KEY] || null;
@@ -101,30 +105,195 @@ async function tick() {
   }
 }
 
+// ---- Zenginleştirme: toplanan sayfalara gidip e-posta/telefon arama ----
+// Aynı "alarm + executeScript" deseniyle çalışır, ama iki fazlı: bir tikte
+// hedef sekmeyi reklam verenin "İletişim ve Temel Bilgiler" sayfasına
+// yönlendirir, bir SONRAKİ tikte (sayfanın render olması için birkaç
+// saniye geçtikten sonra) o sayfadan e-posta/telefon çıkarır. Bu, sayfa
+// yüklemesini beklemek için servis çalışanı içinde uzun bir "sleep"
+// kullanmaktan kaçınır (servis çalışanı uzun beklemelerde sonlanabilir).
+
+function buildAboutContactUrl(pageUrl) {
+  try {
+    const u = new URL(pageUrl);
+    if (u.pathname.includes("profile.php")) {
+      const id = u.searchParams.get("id");
+      if (!id) return null;
+      return `${u.origin}/profile.php?id=${id}&sk=about_contact_and_basic_info`;
+    }
+    const path = u.pathname.replace(/\/$/, "");
+    return `${u.origin}${path}/about_contact_and_basic_info`;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function getEnrichConfig() {
+  const result = await chrome.storage.local.get(ENRICH_CONFIG_KEY);
+  return result[ENRICH_CONFIG_KEY] || null;
+}
+
+async function patchEnrichConfig(patch) {
+  const current = (await getEnrichConfig()) || {};
+  await chrome.storage.local.set({ [ENRICH_CONFIG_KEY]: { ...current, ...patch } });
+}
+
+async function setEnrichStatus(status) {
+  await chrome.storage.local.set({ [ENRICH_STATUS_KEY]: status });
+}
+
+async function stopEnrichment(reason) {
+  await chrome.alarms.clear(ENRICH_ALARM);
+  const config = await getEnrichConfig();
+  await patchEnrichConfig({ running: false });
+  await setEnrichStatus({
+    running: false,
+    finished: true,
+    processed: config ? config.processed : 0,
+    total: config ? config.total : 0,
+    found: config ? config.found : 0,
+    reason,
+  });
+}
+
+function extractContactInfoFromPage() {
+  const text = document.body.innerText || "";
+  const mailtoLinks = [...document.querySelectorAll('a[href^="mailto:"]')].map((a) =>
+    decodeURIComponent(a.href.replace("mailto:", "")).split("?")[0].trim()
+  );
+  const telLinks = [...document.querySelectorAll('a[href^="tel:"]')].map((a) =>
+    decodeURIComponent(a.href.replace("tel:", "")).trim()
+  );
+  const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  const phoneMatch = text.match(/(\+?\d[\d\s().-]{7,}\d)/);
+  return {
+    email: mailtoLinks[0] || (emailMatch ? emailMatch[0] : ""),
+    phone: telLinks[0] || (phoneMatch ? phoneMatch[0].trim() : ""),
+  };
+}
+
+async function enrichTick() {
+  const config = await getEnrichConfig();
+  if (!config || !config.running || !config.tabId) {
+    await stopEnrichment("durduruldu");
+    return;
+  }
+
+  if (config.phase === "navigate") {
+    if (config.queue.length === 0) {
+      await stopEnrichment("tüm kayıtlar işlendi");
+      return;
+    }
+
+    const [nextKey, ...rest] = config.queue;
+    const dataResult = await chrome.storage.local.get(STORAGE_KEY);
+    const store = dataResult[STORAGE_KEY] || {};
+    const record = store[nextKey];
+    const url = record && record.advertiserUrl ? buildAboutContactUrl(record.advertiserUrl) : null;
+
+    if (!url) {
+      await patchEnrichConfig({ queue: rest, processed: config.processed + 1 });
+      return;
+    }
+
+    try {
+      await chrome.tabs.update(config.tabId, { url });
+    } catch (err) {
+      await stopEnrichment("sekme kapatıldı veya erişilemedi");
+      return;
+    }
+
+    await patchEnrichConfig({ queue: rest, phase: "extract", currentKey: nextKey });
+    return;
+  }
+
+  // phase === "extract": önceki tikte açılan sayfanın artık render olmuş
+  // olması beklenir; oradan bilgi çıkarılır.
+  let extracted = null;
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: config.tabId },
+      func: extractContactInfoFromPage,
+    });
+    extracted = results && results[0] ? results[0].result : null;
+  } catch (err) {
+    extracted = null;
+  }
+
+  const dataResult = await chrome.storage.local.get(STORAGE_KEY);
+  const store = dataResult[STORAGE_KEY] || {};
+  const key = config.currentKey;
+  let found = config.found;
+
+  if (key && store[key]) {
+    store[key].email = (extracted && extracted.email) || store[key].email || "";
+    store[key].phone = (extracted && extracted.phone) || store[key].phone || "";
+    store[key].enrichedAt = new Date().toISOString();
+    if (extracted && (extracted.email || extracted.phone)) found++;
+    await chrome.storage.local.set({ [STORAGE_KEY]: store });
+  }
+
+  const processed = config.processed + 1;
+  await patchEnrichConfig({ phase: "navigate", currentKey: null, processed, found });
+  await setEnrichStatus({
+    running: true,
+    finished: false,
+    processed,
+    total: config.total,
+    found,
+    reason: "",
+  });
+
+  if (config.queue.length === 0) {
+    await stopEnrichment("tüm kayıtlar işlendi");
+  }
+}
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === TICK_ALARM) tick();
+  if (alarm.name === ENRICH_ALARM) enrichTick();
 });
 
-// Popup, fbAdsAutoConfig.running değerini true/false yaptığında alarmı
-// buradan başlatıp durduruyoruz; böylece tetikleyici tek bir yerde.
+// Popup, fbAdsAutoConfig.running / fbAdsEnrichConfig.running değerini
+// true/false yaptığında ilgili alarmı buradan başlatıp durduruyoruz;
+// böylece tetikleyici tek bir yerde.
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !changes[AUTO_CONFIG_KEY]) return;
-  const newValue = changes[AUTO_CONFIG_KEY].newValue;
-  const oldValue = changes[AUTO_CONFIG_KEY].oldValue;
+  if (area !== "local") return;
 
-  if (newValue && newValue.running && !(oldValue && oldValue.running)) {
-    startTicking();
-  } else if (oldValue && oldValue.running && (!newValue || !newValue.running)) {
-    chrome.alarms.clear(TICK_ALARM);
+  if (changes[AUTO_CONFIG_KEY]) {
+    const newValue = changes[AUTO_CONFIG_KEY].newValue;
+    const oldValue = changes[AUTO_CONFIG_KEY].oldValue;
+    if (newValue && newValue.running && !(oldValue && oldValue.running)) {
+      startTicking();
+    } else if (oldValue && oldValue.running && (!newValue || !newValue.running)) {
+      chrome.alarms.clear(TICK_ALARM);
+    }
+  }
+
+  if (changes[ENRICH_CONFIG_KEY]) {
+    const newValue = changes[ENRICH_CONFIG_KEY].newValue;
+    const oldValue = changes[ENRICH_CONFIG_KEY].oldValue;
+    if (newValue && newValue.running && !(oldValue && oldValue.running)) {
+      // periodInMinutes ~5 saniye; sayfanın render olması için tik başına
+      // bir faz (navigate/extract) ilerler, bkz. enrichTick().
+      chrome.alarms.create(ENRICH_ALARM, { periodInMinutes: 0.08 });
+    } else if (oldValue && oldValue.running && (!newValue || !newValue.running)) {
+      chrome.alarms.clear(ENRICH_ALARM);
+    }
   }
 });
 
-// Tarayıcı yeniden başlatıldığında otomasyon hâlâ "running" ise alarmı
-// yeniden kurar (service worker sonlanmış olsa da alarm kendisi hayatta
-// kalır, ama emin olmak için burada da kontrol ediyoruz).
+// Tarayıcı yeniden başlatıldığında otomasyon/zenginleştirme hâlâ "running"
+// ise alarmı yeniden kurar (service worker sonlanmış olsa da alarm
+// kendisi hayatta kalır, ama emin olmak için burada da kontrol ediyoruz).
 chrome.runtime.onStartup.addListener(async () => {
   const config = await getAutoConfig();
   if (config && config.running) startTicking();
+
+  const enrichConfig = await getEnrichConfig();
+  if (enrichConfig && enrichConfig.running) {
+    chrome.alarms.create(ENRICH_ALARM, { periodInMinutes: 0.08 });
+  }
 });
 
 // Reklam sayısı değiştikçe action badge'ini günceller.

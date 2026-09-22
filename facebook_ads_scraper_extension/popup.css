@@ -152,3 +152,9 @@ button.secondary {
 .status.success {
   color: #1a7a3d;
 }
+
+.divider {
+  border: none;
+  border-top: 1px solid #e4e6eb;
+  margin: 14px 0;
+}
