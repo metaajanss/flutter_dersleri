@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>FB Ads Library Toplayıcı</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <h1>Facebook Ads Library</h1>
+  <p class="subtitle">Reklam veren toplayıcı</p>
+
+  <div class="field">
+    <label for="keyword">Anahtar Kelime</label>
+    <input id="keyword" type="text" placeholder="örn. spor ayakkabı" />
+  </div>
+
+  <div class="field">
+    <label>Toplama Miktarı</label>
+    <div class="radio-row">
+      <label class="radio-option">
+        <input type="radio" name="mode" value="all" checked />
+        Tüm sonuçları çek
+      </label>
+      <label class="radio-option">
+        <input type="radio" name="mode" value="count" />
+        Belirli adet çek
+      </label>
+    </div>
+    <input id="countInput" type="number" min="1" step="1" placeholder="örn. 200" disabled />
+  </div>
+
+  <div class="actions">
+    <button id="startBtn">Aramayı Başlat ve Topla</button>
+    <button id="stopBtn" class="secondary" hidden>Otomasyonu Durdur</button>
+  </div>
+
+  <div id="autoStatus" class="auto-status" hidden></div>
+
+  <div class="stat">
+    <span id="count">0</span>
+    <span class="label">benzersiz reklam veren</span>
+  </div>
+
+  <div class="actions">
+    <button id="exportBtn">Excel'e Aktar (.xlsx)</button>
+    <button id="clearBtn" class="secondary">Verileri Temizle</button>
+  </div>
+
+  <p id="status" class="status"></p>
+
+  <p class="hint">
+    Anahtar kelimeyi girip "Aramayı Başlat ve Topla"ya bastığında, aktif
+    reklamlar için Facebook Ads Library <strong>ayrı bir pencerede</strong>
+    açılır ve sayfa otomatik olarak aşağı kaydırılarak tüm reklam verenler
+    (veya seçtiğin adet kadarı) toplanır. Aynı reklam veren tekrar
+    kaydedilmez.
+    <br /><br />
+    <strong>Önemli:</strong> Bu pencereyi <strong>küçültmeyin</strong>
+    (minimize etmeyin) — küçültülmüş veya farklı bir sekmeye geçilmiş
+    pencerelerde tarayıcı işlemleri durdurur. Pencereyi arkada/kenarda
+    bırakıp başka bir pencerede çalışmaya devam edebilirsiniz, otomasyon
+    yine de ilerler.
+  </p>
+
+  <script src="xlsx-writer.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
