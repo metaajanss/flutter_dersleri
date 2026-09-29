@@ -69,9 +69,11 @@ async function stopAutomation(reason) {
   await trimToTarget(finalConfig);
   // Durduktan sonra sayfada geç yüklenen kartlar hedefi tekrar aşmasın diye
   // üst sınır kısa bir süre daha (content.js saveRecords) korunur.
-  await patchAutoConfig({ running: false, capUntil: Date.now() + 60000 });
+  // Durum ÖNCE yazılır; sonra config.running=false yazılınca tetiklenen
+  // markStoppedByUser, durumu zaten "bitti" görüp sebebi ezmez.
   const collected = await getCollectedCount();
   await setAutoStatus({ running: false, finished: true, collected, reason });
+  await patchAutoConfig({ running: false, capUntil: Date.now() + 60000 });
   clearBadge();
 }
 
@@ -83,7 +85,21 @@ async function startTicking() {
   await chrome.alarms.create(TICK_ALARM, { periodInMinutes: 0.05 });
 }
 
+let tickBusy = false;
+
 async function tick() {
+  // Bir önceki tur (yavaş sayfada executeScript uzun sürebilir) bitmeden
+  // yenisi başlamasın; aksi halde turlar üst üste biner ve sayfa tıkanır.
+  if (tickBusy) return;
+  tickBusy = true;
+  try {
+    await tickOnce();
+  } finally {
+    tickBusy = false;
+  }
+}
+
+async function tickOnce() {
   const config = await getAutoConfig();
   if (!config || !config.running || !config.tabId) {
     await stopAutomation("durduruldu");
@@ -113,6 +129,11 @@ async function tick() {
     await stopAutomation("sekme kapatıldı veya erişilemedi");
     return;
   }
+
+  // Tur sürerken kullanıcı "Durdur"a bastıysa durum kutusunu tekrar
+  // "çalışıyor" yapma.
+  const latest = await getAutoConfig();
+  if (!latest || !latest.running) return;
 
   const iterations = (config.iterations || 0) + 1;
 
@@ -181,7 +202,6 @@ async function setEnrichStatus(status) {
 async function stopEnrichment(reason) {
   await chrome.alarms.clear(ENRICH_ALARM);
   const config = await getEnrichConfig();
-  await patchEnrichConfig({ running: false });
   await setEnrichStatus({
     running: false,
     finished: true,
@@ -190,6 +210,7 @@ async function stopEnrichment(reason) {
     found: config ? config.found : 0,
     reason,
   });
+  await patchEnrichConfig({ running: false });
   clearBadge();
 }
 
@@ -257,6 +278,9 @@ async function enrichTick() {
     extracted = null;
   }
 
+  const stillRunning = await getEnrichConfig();
+  if (!stillRunning || !stillRunning.running) return;
+
   const dataResult = await chrome.storage.local.get(STORAGE_KEY);
   const store = dataResult[STORAGE_KEY] || {};
   const key = config.currentKey;
@@ -288,6 +312,31 @@ async function enrichTick() {
   }
 }
 
+// Popup "Durdur"a bastığında (config.running=false) arayüzün "çalışıyor"da
+// takılı kalmaması için durum kutusunu "bitti" olarak işaretler.
+async function markStoppedByUser() {
+  const result = await chrome.storage.local.get(AUTO_STATUS_KEY);
+  const status = result[AUTO_STATUS_KEY];
+  if (status && status.running) {
+    await setAutoStatus({
+      running: false,
+      finished: true,
+      collected: await getCollectedCount(),
+      reason: "durduruldu",
+    });
+  }
+  clearBadge();
+}
+
+async function markEnrichStoppedByUser() {
+  const result = await chrome.storage.local.get(ENRICH_STATUS_KEY);
+  const status = result[ENRICH_STATUS_KEY];
+  if (status && status.running) {
+    await setEnrichStatus({ ...status, running: false, finished: true, reason: "durduruldu" });
+  }
+  clearBadge();
+}
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === TICK_ALARM) tick();
   if (alarm.name === ENRICH_ALARM) enrichTick();
@@ -306,6 +355,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       startTicking();
     } else if (oldValue && oldValue.running && (!newValue || !newValue.running)) {
       chrome.alarms.clear(TICK_ALARM);
+      markStoppedByUser();
     }
   }
 
@@ -318,6 +368,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       chrome.alarms.create(ENRICH_ALARM, { periodInMinutes: 0.08 });
     } else if (oldValue && oldValue.running && (!newValue || !newValue.running)) {
       chrome.alarms.clear(ENRICH_ALARM);
+      markEnrichStoppedByUser();
     }
   }
 });

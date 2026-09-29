@@ -11,6 +11,9 @@
   const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
   const SEEN_KEYS_IN_MEMORY = new Set(); // bu sekmede zaten işlenmiş kart elemanlarını tutar (WeakSet yerine Set+WeakMap)
   const PROCESSED_ELEMENTS = new WeakSet();
+  // Kart bulunmuş metin düğümlerini tekrar tekrar ata doğru tırmanmadan
+  // atlamak için; binlerce kartta her turun sayfayı dondurmasını önler.
+  const TEXT_NODE_CARD = new WeakMap();
   let scanScheduled = false;
   let totalCountCache = 0;
 
@@ -33,7 +36,7 @@
     const cards = new Set();
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
-        return node.nodeValue && LIBRARY_ID_TEXT.test(node.nodeValue)
+        return !PROCESSED_ELEMENTS.has(TEXT_NODE_CARD.get(node)) && node.nodeValue && LIBRARY_ID_TEXT.test(node.nodeValue)
           ? NodeFilter.FILTER_ACCEPT
           : NodeFilter.FILTER_SKIP;
       },
@@ -51,7 +54,10 @@
           break;
         }
       }
-      if (candidate) cards.add(candidate);
+      if (candidate) {
+        cards.add(candidate);
+        TEXT_NODE_CARD.set(textNode, candidate);
+      }
     }
     return [...cards];
   }
