@@ -165,17 +165,73 @@ async function refreshAutoStatus() {
 modeRadios.forEach((radio) => radio.addEventListener("change", updateModeUi));
 updateModeUi();
 
+async function startAutomation({ keyword, mode, targetCount, tabId }) {
+  await chrome.storage.local.set({
+    [AUTO_CONFIG_KEY]: {
+      keyword,
+      mode,
+      targetCount: mode === "count" ? targetCount : 0,
+      running: true,
+      startedAt: Date.now(),
+      tabId,
+      iterations: 0,
+      idleStreak: 0,
+    },
+    [AUTO_STATUS_KEY]: {
+      running: true,
+      finished: false,
+      collected: 0,
+      target: mode === "count" ? targetCount : null,
+      reason: "",
+    },
+  });
+  await refreshAutoStatus();
+}
+
+// Sayfa eklenti yüklenmeden önce açıldıysa content script orada yoktur;
+// bu durumda elle enjekte edilir.
+async function ensureContentScript(tabId) {
+  const [probe] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => typeof window.__fbAdsTick === "function",
+  });
+  if (!probe || !probe.result) {
+    await chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] });
+  }
+}
+
 startBtn.addEventListener("click", async () => {
   const keyword = keywordInput.value.trim();
-  if (!keyword) {
-    showStatus("Lütfen bir anahtar kelime girin.", "error");
-    return;
-  }
 
   const mode = currentMode();
   const targetCount = mode === "count" ? parseInt(countInput.value, 10) : 0;
   if (mode === "count" && (!Number.isFinite(targetCount) || targetCount <= 0)) {
     showStatus("Lütfen geçerli bir adet girin.", "error");
+    return;
+  }
+
+  // Anahtar kelime boşsa: kullanıcının kendi filtrelediği, şu an açık olan
+  // Ads Library sekmesinde doğrudan başla.
+  if (!keyword) {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!activeTab || !activeTab.url || !activeTab.url.startsWith("https://www.facebook.com/ads/library")) {
+      showStatus(
+        "Anahtar kelime girin ya da önce Facebook Ads Library sayfasını açıp filtreleyin.",
+        "error"
+      );
+      return;
+    }
+
+    try {
+      await ensureContentScript(activeTab.id);
+    } catch (e) {
+      showStatus("Sayfaya erişilemedi, sayfayı yenileyip tekrar deneyin.", "error");
+      return;
+    }
+
+    const urlKeyword = new URL(activeTab.url).searchParams.get("q") || "";
+    await startAutomation({ keyword: urlKeyword, mode, targetCount, tabId: activeTab.id });
+    showStatus("Bu sayfada toplama başladı. Başka sekmeye geçebilirsiniz, devam eder.", "success");
     return;
   }
 
@@ -219,32 +275,12 @@ startBtn.addEventListener("click", async () => {
     tabId = win.tabs && win.tabs[0] ? win.tabs[0].id : null;
   }
 
-  await chrome.storage.local.set({
-    [AUTO_CONFIG_KEY]: {
-      keyword,
-      mode,
-      targetCount: mode === "count" ? targetCount : 0,
-      running: true,
-      startedAt: Date.now(),
-      tabId,
-      iterations: 0,
-      idleStreak: 0,
-    },
-    [AUTO_STATUS_KEY]: {
-      running: true,
-      finished: false,
-      collected: 0,
-      target: mode === "count" ? targetCount : null,
-      reason: "",
-    },
-  });
-
+  await startAutomation({ keyword, mode, targetCount, tabId });
   showStatus(
     "Arama başlatıldı. Sekmeye/pencereye bakmasanız, başka bir pencerenin " +
       "arkasında kalsa bile otomasyon arka planda devam eder.",
     "success"
   );
-  await refreshAutoStatus();
 });
 
 stopBtn.addEventListener("click", async () => {

@@ -4,6 +4,9 @@
 // bir MutationObserver ile DOM değişiklikleri izlenir ve yeni eklenen kartlar taranır.
 
 (() => {
+  // Popup elle enjekte ettiğinde ikinci kez kurulmasın.
+  if (typeof window.__fbAdsTick === "function") return;
+
   const STORAGE_KEY = "fbAdsLibraryData";
   const AUTO_CONFIG_KEY = "fbAdsAutoConfig";
   const SEEN_KEYS_IN_MEMORY = new Set(); // bu sekmede zaten işlenmiş kart elemanlarını tutar (WeakSet yerine Set+WeakMap)
