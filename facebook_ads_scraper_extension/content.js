@@ -22,13 +22,18 @@
     return s;
   }
 
-  // Sayfadaki "Library ID:" metnini içeren yaprak düğümlerden yola çıkarak
-  // en yakın "kart" konteynerini bulur.
+  // Facebook arayüzü kullanıcının diline göre çevrilir ("Library ID",
+  // "Kütüphane Kimliği" vb.), bu yüzden etikete değil şekle bakılır:
+  // "<etiket>: <12-20 haneli sayı>" biçimindeki yaprak metin düğümü.
+  const LIBRARY_ID_TEXT = /^[^\d:]{2,60}:\s*\d{12,20}\s*$/;
+  const LIBRARY_ID_VALUE = /:\s*(\d{12,20})/;
+
+  // Bu metni içeren düğümlerden yola çıkarak en yakın "kart" konteynerini bulur.
   function findAdCards() {
     const cards = new Set();
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
-        return node.nodeValue && node.nodeValue.includes("Library ID")
+        return node.nodeValue && LIBRARY_ID_TEXT.test(node.nodeValue)
           ? NodeFilter.FILTER_ACCEPT
           : NodeFilter.FILTER_SKIP;
       },
@@ -104,15 +109,15 @@
 
   function extractAdData(card, keyword) {
     const fullText = textOf(card);
-    if (!fullText.includes("Library ID")) return null;
+    const libraryIdMatch = fullText.match(LIBRARY_ID_VALUE);
+    if (!libraryIdMatch) return null;
 
     const { advertiserName, advertiserUrl, pageId } = extractAdvertiser(card);
     if (!advertiserName) return null;
 
-    const libraryIdMatch = fullText.match(/Library ID:\s*([0-9]+)/i);
-    const startedMatch = fullText.match(/Started running on\s*([^\n·|]+?)(?:\s{2,}|·|$)/i);
-    const statusMatch = fullText.match(/\b(Active|Inactive|Aktif|Devre dışı)\b/);
-    const platformsMatch = fullText.match(/Platforms\s*([^\n]+)/i);
+    const startedMatch = fullText.match(/(?:Started running on|Yayınlanmaya başladı:?)\s*([^\n·|]+?)(?:\s{2,}|·|$)/i);
+    const statusMatch = fullText.match(/\b(Active|Inactive|Aktif|Pasif|Devre dışı)\b/);
+    const platformsMatch = fullText.match(/(?:Platforms|Platformlar)\s*([^\n]+)/i);
 
     return {
       advertiserName: advertiserName.trim(),
@@ -135,12 +140,17 @@
   async function saveRecords(newRecords) {
     if (newRecords.length === 0) return;
 
-    const result = await chrome.storage.local.get(STORAGE_KEY);
+    const result = await chrome.storage.local.get([STORAGE_KEY, AUTO_CONFIG_KEY]);
     const store = result[STORAGE_KEY] || {};
+    const auto = result[AUTO_CONFIG_KEY];
+    // "Belirli adet" çalışırken hedefi aşan kayıtları hiç ekleme.
+    const capActive = auto && (auto.running || (auto.capUntil && Date.now() < auto.capUntil));
+    const cap = capActive && auto.mode === "count" && auto.targetCount > 0 ? auto.targetCount : Infinity;
     let added = 0;
 
     for (const record of newRecords) {
       const key = dedupeKey(record);
+      if (Object.keys(store).length >= cap) break;
       if (!store[key]) {
         store[key] = record;
         added++;

@@ -50,9 +50,26 @@ function clearBadge() {
   chrome.action.setBadgeText({ text: "" });
 }
 
+// "Belirli adet" modunda son yüklenen grup hedefi aşmış olabilir; fazlalığı
+// (en son eklenenleri) atar. Kayıtlar eklenme sırasını korur.
+async function trimToTarget(config) {
+  if (!config || config.mode !== "count" || !(config.targetCount > 0)) return;
+  const result = await chrome.storage.local.get(STORAGE_KEY);
+  const store = result[STORAGE_KEY] || {};
+  const keys = Object.keys(store);
+  if (keys.length <= config.targetCount) return;
+  const trimmed = {};
+  for (const key of keys.slice(0, config.targetCount)) trimmed[key] = store[key];
+  await chrome.storage.local.set({ [STORAGE_KEY]: trimmed });
+}
+
 async function stopAutomation(reason) {
   await chrome.alarms.clear(TICK_ALARM);
-  await patchAutoConfig({ running: false });
+  const finalConfig = await getAutoConfig();
+  await trimToTarget(finalConfig);
+  // Durduktan sonra sayfada geç yüklenen kartlar hedefi tekrar aşmasın diye
+  // üst sınır kısa bir süre daha (content.js saveRecords) korunur.
+  await patchAutoConfig({ running: false, capUntil: Date.now() + 60000 });
   const collected = await getCollectedCount();
   await setAutoStatus({ running: false, finished: true, collected, reason });
   clearBadge();
@@ -73,7 +90,13 @@ async function tick() {
     return;
   }
 
-  const before = await getCollectedCount();
+  // Yeni kartlar kaydırmadan biraz SONRA (sayfa yüklenince, MutationObserver
+  // ile) kaydedilir; bu yüzden büyüme, aynı tik içinde önce/sonra
+  // karşılaştırılarak değil, bir önceki tikte görülen sayıyla şu anki sayı
+  // karşılaştırılarak ölçülür. Aksi halde liste büyürken bile her tur
+  // "değişmedi" sayılıp otomasyon erken biterdi.
+  const after = await getCollectedCount();
+  const idleStreak = after === (config.lastCount ?? -1) ? (config.idleStreak || 0) + 1 : 0;
 
   try {
     await chrome.scripting.executeScript({
@@ -91,11 +114,9 @@ async function tick() {
     return;
   }
 
-  const after = await getCollectedCount();
   const iterations = (config.iterations || 0) + 1;
-  const idleStreak = after === before ? (config.idleStreak || 0) + 1 : 0;
 
-  await patchAutoConfig({ iterations, idleStreak });
+  await patchAutoConfig({ iterations, idleStreak, lastCount: after });
   await setAutoStatus({
     running: true,
     finished: false,
